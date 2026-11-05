@@ -19,6 +19,7 @@ Keep this file current. No changelog — git log is the history.
 | `src-tauri/tauri.conf.json` | the window; the per-user NSIS installer; the updater (public key, GitHub's `latest.json`) |
 | `.github/workflows/release.yml` | a `v*` tag publishes the release; a manual run builds without publishing |
 | `scripts/win.sh` | from WSL, the Rust side with the Windows toolchain: `fmt`, `check`, `test`, `build` |
+| `docs/design.md` | the look (colours, type, buttons) and each screen's layout and behaviour; read before UI work |
 
 ## How to run and test
 
