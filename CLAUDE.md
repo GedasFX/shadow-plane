@@ -12,14 +12,15 @@ Keep this file current. No changelog — git log is the history.
 | `src/routes/` | the page: SvelteKit as a single-page app (adapter-static, no SSR) |
 | `src/**/*.svelte.test.ts` | component tests in happy-dom; Tauri mocked with `mockIPC` |
 | `src-tauri/` | the Rust app: `src/main.rs`; `capabilities/` (what the page may call) |
+| `src-tauri/src/db.rs`, `src-tauri/migrations/` | SQLite in the app's data folder; numbered migrations applied at start |
 | `src-tauri/tauri.conf.json` | the window; the per-user NSIS installer; the updater (public key, GitHub's `latest.json`) |
 | `.github/workflows/release.yml` | a `v*` tag publishes the release; a manual run builds without publishing |
-| `scripts/win.sh` | from WSL, the Rust side with the Windows toolchain: `fmt`, `check`, `build` |
+| `scripts/win.sh` | from WSL, the Rust side with the Windows toolchain: `fmt`, `check`, `test`, `build` |
 
 ## How to run and test
 
 `bun run check && bun run lint && bun run test && bun run build` (in WSL) and `scripts/win.sh check`
-(`cargo fmt --check`, `clippy -D warnings`) must pass before a commit. Biome formats everything but
+(`cargo fmt --check`, `clippy -D warnings`) and `test` must pass before a commit. Biome formats everything but
 `.svelte`; Prettier formats `.svelte`, in the same style. `scripts/win.sh build` makes the release .exe.
 
 To release: set `version` in `src-tauri/Cargo.toml`, commit, then tag `v<version>` and push the tag.
@@ -32,6 +33,11 @@ release at launch and update themselves.
 - The updater signing key (Actions secrets `TAURI_SIGNING_PRIVATE_KEY` and its password) never
   changes: installed copies refuse a release signed with any other key. A backup is kept outside the
   repo.
+
+- A migration never changes once released: each runs once (`PRAGMA user_version` counts them), so a
+  schema change is a new numbered file.
+- A quality profile is keyed by encoder as well as game, output tier and bits-per-pixel band: each
+  encoder's quality setting is its own scale, so their measurements never mix.
 
 ## Traps
 

@@ -5,6 +5,7 @@
 #
 #   scripts/win.sh fmt     cargo fmt
 #   scripts/win.sh check   cargo fmt --check, then clippy with warnings as errors
+#   scripts/win.sh test    cargo test
 #   scripts/win.sh build   the frontend, then the release .exe; prints its path
 set -euo pipefail
 cd "$(dirname "$0")/.."
@@ -12,9 +13,10 @@ cd "$(dirname "$0")/.."
 case "${1:-}" in
   fmt) cmd='& $cargo fmt' ;;
   check) cmd='& $cargo fmt --check; if ($LASTEXITCODE) { exit $LASTEXITCODE }; & $cargo clippy --all-targets -- -D warnings' ;;
+  test) cmd='& $cargo test' ;;
   build) bun run build >/dev/null
          cmd='& $cargo tauri build --no-bundle; if ($LASTEXITCODE) { exit $LASTEXITCODE }; "$env:CARGO_TARGET_DIR\release\shadow-plane.exe"' ;;
-  *) echo "usage: scripts/win.sh fmt|check|build" >&2; exit 2 ;;
+  *) echo "usage: scripts/win.sh fmt|check|test|build" >&2; exit 2 ;;
 esac
 
 # Build output on a local Windows disk: linking over the WSL share is slow.
