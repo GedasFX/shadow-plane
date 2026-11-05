@@ -19,9 +19,10 @@ Keep this file current. No changelog — git log is the history.
 
 ## How to run and test
 
-`bun run check && bun run lint && bun run test && bun run build` (in WSL) and `scripts/win.sh check`
-(`cargo fmt --check`, `clippy -D warnings`) and `test` must pass before a commit. Biome formats everything but
-`.svelte`; Prettier formats `.svelte`, in the same style. `scripts/win.sh build` makes the release .exe.
+`bun run check && bun run lint && bun run test && bun run build` (in WSL), `scripts/win.sh check`
+(`cargo fmt --check`, `clippy -D warnings`) and `scripts/win.sh test` must pass before a commit. Biome
+formats everything but `.svelte`; Prettier formats `.svelte`, in the same style. `scripts/win.sh build`
+makes the release .exe.
 
 To release: set `version` in `src-tauri/Cargo.toml`, commit, then tag `v<version>` and push the tag.
 The workflow refuses a tag that differs from that version. Installed copies check for the latest
@@ -33,7 +34,6 @@ release at launch and update themselves.
 - The updater signing key (Actions secrets `TAURI_SIGNING_PRIVATE_KEY` and its password) never
   changes: installed copies refuse a release signed with any other key. A backup is kept outside the
   repo.
-
 - A migration never changes once released: each runs once (`PRAGMA user_version` counts them), so a
   schema change is a new numbered file.
 - A quality profile is keyed by encoder as well as game, output tier and bits-per-pixel band: each

@@ -100,4 +100,18 @@ mod tests {
         decide("reject").unwrap();
         assert!(decide("maybe").is_err());
     }
+
+    #[test]
+    fn a_decision_has_a_whole_band_or_none() {
+        let conn = memory();
+        let decide = |band: &str| {
+            conn.execute_batch(&format!(
+                "INSERT OR REPLACE INTO decision (source, action, decided_at, band_lo, band_hi, p1_floor)
+                 VALUES ('a.mp4', 'queue', '2026-11-05', {band})"
+            ))
+        };
+        decide("90, 93, 77").unwrap();
+        decide("NULL, NULL, NULL").unwrap();
+        assert!(decide("90, NULL, 77").is_err());
+    }
 }

@@ -34,13 +34,19 @@ CREATE TABLE quality_target (
   edited_at TEXT NOT NULL
 ) STRICT;
 
--- What the user decided for a recording, keyed by its path in the library folder.
+-- What the user decided for a recording, keyed by its path in the library folder. A null max_height
+-- keeps the source's resolution; a null band means the game's quality target.
 CREATE TABLE decision (
   source TEXT PRIMARY KEY,
   action TEXT NOT NULL CHECK (action IN ('queue', 'skip', 'reject')),
   title TEXT,
   note TEXT,
-  decided_at TEXT NOT NULL
+  max_height INTEGER,
+  band_lo REAL,
+  band_hi REAL,
+  p1_floor REAL,
+  decided_at TEXT NOT NULL,
+  CHECK ((band_lo IS NULL) = (band_hi IS NULL) AND (band_lo IS NULL) = (p1_floor IS NULL))
 ) STRICT;
 
 CREATE TABLE clip (
