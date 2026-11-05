@@ -1,0 +1,3 @@
+# Scripts run on bun too, not on the node their tools name in their shebang.
+[run]
+bun = true
