@@ -3,9 +3,10 @@ use std::path::Path;
 use std::time::Duration;
 
 // In order. Each runs once, in a transaction; PRAGMA user_version counts how many have run.
-const MIGRATIONS: &[&str] = &[include_str!(
-    "../migrations/001_settings_quality_decisions.sql"
-)];
+const MIGRATIONS: &[&str] = &[
+    include_str!("../migrations/001_settings_quality_decisions.sql"),
+    include_str!("../migrations/002_source.sql"),
+];
 
 pub fn open(path: &Path) -> rusqlite::Result<Connection> {
     let mut conn = Connection::open(path)?;

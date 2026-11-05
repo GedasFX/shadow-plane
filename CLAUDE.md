@@ -14,6 +14,8 @@ Keep this file current. No changelog — git log is the history.
 | `src-tauri/` | the Rust app: `src/main.rs`; `capabilities/` (what the page may call) |
 | `src-tauri/src/db.rs`, `src-tauri/migrations/` | SQLite in the app's data folder; numbered migrations applied at start |
 | `src-tauri/src/settings.rs` | the `setting` table: the library folder |
+| `src-tauri/src/library.rs` | the scan: the library's `.mp4` files into the `source` index; only new and changed files are probed |
+| `src-tauri/src/ffprobe.rs` | a video's length and height; ffprobe is found on `PATH` |
 | `src-tauri/tauri.conf.json` | the window; the per-user NSIS installer; the updater (public key, GitHub's `latest.json`) |
 | `.github/workflows/release.yml` | a `v*` tag publishes the release; a manual run builds without publishing |
 | `scripts/win.sh` | from WSL, the Rust side with the Windows toolchain: `fmt`, `check`, `test`, `build` |
@@ -37,6 +39,10 @@ release at launch and update themselves.
   repo.
 - A migration never changes once released: each runs once (`PRAGMA user_version` counts them), so a
   schema change is a new numbered file.
+- The scan skips folders whose names start with `_`: the app's output and bin live inside the library,
+  and scanning them lists finished clips and binned originals as new sources.
+- A source's key is its path below the library folder with `/` between parts, the same key a decision
+  has, so decisions survive a library move.
 - A quality profile is keyed by encoder as well as game, output tier and bits-per-pixel band: each
   encoder's quality setting is its own scale, so their measurements never mix.
 

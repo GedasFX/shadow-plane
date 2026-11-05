@@ -2,15 +2,21 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod db;
+mod ffprobe;
+mod library;
 mod settings;
 
 use rusqlite::Connection;
+use std::path::Path;
 use std::sync::Mutex;
 use tauri::{Manager, State};
 use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_updater::UpdaterExt;
 
 struct Db(Mutex<Connection>);
+
+// Held through a scan: a second scan waits, then works from the first one's index and the latest folder.
+struct Scanning(Mutex<()>);
 
 // On Windows the installer closes the app and starts the new version, so this returns only when
 // there is nothing to install; restart() is for the other platforms.
@@ -51,6 +57,23 @@ async fn choose_library(
     Ok(Some(path))
 }
 
+// The scan waits on ffprobe for seconds, so it runs on a thread meant for blocking work.
+#[tauri::command]
+async fn scan(app: tauri::AppHandle) -> Result<library::Scan, String> {
+    let work = tauri::async_runtime::spawn_blocking(move || {
+        let scanning = app.state::<Scanning>();
+        let _one_at_a_time = scanning.0.lock().unwrap();
+        let db = app.state::<Db>();
+        let root =
+            settings::get(&db.0.lock().unwrap(), settings::LIBRARY).map_err(|e| e.to_string())?;
+        let root = root.ok_or("No library folder chosen yet")?;
+
+        library::scan(&db.0, Path::new(&root), ffprobe::probe).map_err(|e| e.to_string())
+    });
+
+    work.await.map_err(|e| e.to_string())?
+}
+
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
@@ -60,9 +83,15 @@ fn main() {
             std::fs::create_dir_all(&dir)?;
             let conn = db::open(&dir.join("shadow-plane.db"))?;
             app.manage(Db(Mutex::new(conn)));
+            app.manage(Scanning(Mutex::new(())));
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![update, library, choose_library])
+        .invoke_handler(tauri::generate_handler![
+            update,
+            library,
+            choose_library,
+            scan
+        ])
         .run(tauri::generate_context!())
         .expect("Shadow Plane failed to start");
 }
