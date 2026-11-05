@@ -10,9 +10,10 @@ Keep this file current. No changelog — git log is the history.
 | Path | Job |
 |---|---|
 | `src/routes/` | the page: SvelteKit as a single-page app (adapter-static, no SSR) |
-| `src/**/*.svelte.test.ts` | component tests in happy-dom; Tauri mocked with `mockIPC` |
+| `src/lib/` | components; each tested beside it (`*.svelte.test.ts`) in happy-dom, Tauri mocked with `mockIPC` |
 | `src-tauri/` | the Rust app: `src/main.rs`; `capabilities/` (what the page may call) |
 | `src-tauri/src/db.rs`, `src-tauri/migrations/` | SQLite in the app's data folder; numbered migrations applied at start |
+| `src-tauri/src/settings.rs` | the `setting` table: the library folder |
 | `src-tauri/tauri.conf.json` | the window; the per-user NSIS installer; the updater (public key, GitHub's `latest.json`) |
 | `.github/workflows/release.yml` | a `v*` tag publishes the release; a manual run builds without publishing |
 | `scripts/win.sh` | from WSL, the Rust side with the Windows toolchain: `fmt`, `check`, `test`, `build` |

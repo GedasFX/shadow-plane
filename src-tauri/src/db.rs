@@ -32,15 +32,16 @@ fn migrate(conn: &mut Connection) -> rusqlite::Result<()> {
 }
 
 #[cfg(test)]
+pub fn memory() -> Connection {
+    let mut conn = Connection::open_in_memory().unwrap();
+    configure(&conn).unwrap();
+    migrate(&mut conn).unwrap();
+    conn
+}
+
+#[cfg(test)]
 mod tests {
     use super::*;
-
-    fn memory() -> Connection {
-        let mut conn = Connection::open_in_memory().unwrap();
-        configure(&conn).unwrap();
-        migrate(&mut conn).unwrap();
-        conn
-    }
 
     fn version(conn: &Connection) -> i64 {
         conn.pragma_query_value(None, "user_version", |row| row.get(0))

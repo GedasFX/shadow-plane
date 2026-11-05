@@ -1,6 +1,7 @@
 <script lang="ts">
   import { getVersion } from "@tauri-apps/api/app";
   import { invoke } from "@tauri-apps/api/core";
+  import LibraryFolder from "$lib/LibraryFolder.svelte";
 
   const version = getVersion();
   const update = invoke("update");
@@ -18,4 +19,5 @@
   {:catch error}
     <p>Couldn't check for updates: {error}</p>
   {/await}
+  <LibraryFolder />
 </main>
