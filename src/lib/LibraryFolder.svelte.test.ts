@@ -16,6 +16,8 @@ function app(saved: string | null, picked: string | null, scan: () => Scan = () 
         return picked;
       case "scan":
         return scan();
+      case "games":
+        return [];
     }
   });
   render(LibraryFolder);

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { invoke } from "@tauri-apps/api/core";
+  import GameList from "./GameList.svelte";
 
   type Scan = { sources: number; unreadable: number };
 
@@ -31,6 +32,7 @@
       <p>Scanning…</p>
     {:then found}
       <p>Videos: {found.sources}{found.unreadable ? ` · Unreadable: ${found.unreadable}` : ""}</p>
+      <GameList />
     {:catch error}
       <p>Couldn't scan: {error}</p>
     {/await}

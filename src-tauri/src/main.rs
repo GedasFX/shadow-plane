@@ -42,6 +42,11 @@ fn library(db: State<Db>) -> Result<Option<String>, String> {
     settings::get(&db.0.lock().unwrap(), settings::LIBRARY).map_err(|e| e.to_string())
 }
 
+#[tauri::command]
+fn games(db: State<Db>) -> Result<Vec<library::Game>, String> {
+    library::games(&db.0.lock().unwrap()).map_err(|e| e.to_string())
+}
+
 // Async, so the dialog blocks a worker thread rather than the window's.
 #[tauri::command]
 async fn choose_library(
@@ -90,7 +95,8 @@ fn main() {
             update,
             library,
             choose_library,
-            scan
+            scan,
+            games
         ])
         .run(tauri::generate_context!())
         .expect("Shadow Plane failed to start");
