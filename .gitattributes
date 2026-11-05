@@ -1,0 +1,2 @@
+# Windows checkouts (the release workflow) keep LF: Biome and Prettier fail every file on CRLF.
+* text=auto eol=lf
