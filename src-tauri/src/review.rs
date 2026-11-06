@@ -1,4 +1,5 @@
 use crate::clip_name;
+use crate::library;
 use rusqlite::{Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
 use std::fmt;
@@ -84,13 +85,6 @@ const VIDEOS: &str = "SELECT s.path, s.size, s.modified_ms, s.duration_s, s.widt
         d.action, (SELECT count(*) FROM clip c WHERE c.decision_source = s.path)
      FROM source s LEFT JOIN decision d ON d.source = s.path";
 
-// The game folder a video sits in; "Misc" for one outside any folder.
-fn folder_game(key: &str) -> String {
-    key.split_once('/')
-        .map_or("Misc", |(game, _)| game)
-        .to_owned()
-}
-
 fn file_of(key: &str) -> &str {
     key.rsplit_once('/').map_or(key, |(_, file)| file)
 }
@@ -108,7 +102,7 @@ fn video(row: &rusqlite::Row) -> rusqlite::Result<(Video, i64, i64, f64)> {
     let (at, _) = clip_name::recorded(file_of(&key), modified_ms);
 
     let video = Video {
-        game: folder_game(&key),
+        game: library::game(&key),
         date: at.format("%Y-%m-%dT%H:%M:%S").to_string(),
         key,
         size: row.get(1)?,

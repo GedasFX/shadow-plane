@@ -17,7 +17,7 @@ test("lists each game's videos with their length, height and decision", async ()
   mockIPC((cmd) =>
     cmd === "games"
       ? [
-          { name: "", sources: [source("loose.mp4", 9.6, 720, null)] },
+          { name: "Misc", sources: [source("loose.mp4", 9.6, 720, null)] },
           {
             name: "PEAK",
             sources: [source("a.mp4", 150.27, 1440, "queue"), source("b.mp4", 3725, 1080, "reject")],
@@ -27,7 +27,7 @@ test("lists each game's videos with their length, height and decision", async ()
   );
   render(GameList);
   expect(await screen.findByRole("heading", { name: "PEAK" })).toBeTruthy();
-  expect(screen.getByRole("heading", { name: "Outside game folders" })).toBeTruthy();
+  expect(screen.getByRole("heading", { name: "Misc" })).toBeTruthy();
   expect(screen.getByText("loose.mp4 · 0:09 · 720p")).toBeTruthy();
   expect(screen.getByText("a.mp4 · 2:30 · 1440p · Queued")).toBeTruthy();
   expect(screen.getByText("b.mp4 · 1:02:05 · 1080p · Rejected")).toBeTruthy();

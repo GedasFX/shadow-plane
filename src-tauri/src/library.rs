@@ -170,7 +170,14 @@ where
     })
 }
 
-// The indexed sources by game folder, each with its decision; "" holds those outside any folder.
+// The game folder a video sits in; "Misc" for one outside any folder, as the legacy app had it.
+pub fn game(key: &str) -> String {
+    key.split_once('/')
+        .map_or("Misc", |(game, _)| game)
+        .to_owned()
+}
+
+// The indexed sources by game folder, each with its decision.
 pub fn games(conn: &Connection) -> rusqlite::Result<Vec<Game>> {
     let mut rows = conn.prepare(
         "SELECT s.path, s.duration_s, s.height, d.action
@@ -190,10 +197,12 @@ pub fn games(conn: &Connection) -> rusqlite::Result<Vec<Game>> {
     let mut games: BTreeMap<String, Vec<Source>> = BTreeMap::new();
     for source in rows {
         let mut source = source?;
-        let (game, name) = source.path.split_once('/').unwrap_or(("", &source.path));
-        let game = game.to_owned();
+        let name = source
+            .path
+            .split_once('/')
+            .map_or(&*source.path, |(_, name)| name);
         source.name = name.to_owned();
-        games.entry(game).or_default().push(source);
+        games.entry(game(&source.path)).or_default().push(source);
     }
 
     let games = games
@@ -393,7 +402,6 @@ mod tests {
         assert_eq!(
             games(&conn).unwrap(),
             [
-                game("", vec![source("d.mp4", "d.mp4", 10.0, 720, None)]),
                 game(
                     "Minecraft",
                     vec![source(
@@ -404,6 +412,7 @@ mod tests {
                         None
                     )]
                 ),
+                game("Misc", vec![source("d.mp4", "d.mp4", 10.0, 720, None)]),
                 game(
                     "PEAK",
                     vec![

@@ -28,7 +28,7 @@
 {#await games then games}
   {#each games as game (game.name)}
     <section>
-      <h2>{game.name || "Outside game folders"}</h2>
+      <h2>{game.name}</h2>
       <ul>
         {#each game.sources as source (source.path)}
           <li>{describe(source)}</li>
