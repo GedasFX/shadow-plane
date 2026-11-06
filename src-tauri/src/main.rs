@@ -4,6 +4,7 @@
 mod clip_name;
 mod db;
 mod ffmpeg;
+mod jobs;
 mod library;
 mod media;
 mod review;
@@ -75,6 +76,21 @@ fn discard(db: State<Db>, key: String) -> Result<(), String> {
     review::discard(&db.0.lock().unwrap(), &key, &now).map_err(|e| e.to_string())
 }
 
+#[tauri::command]
+fn queue(db: State<Db>) -> Result<jobs::Queue, String> {
+    jobs::queue(&db.0.lock().unwrap()).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn reorder_jobs(db: State<Db>, ids: Vec<i64>) -> Result<(), String> {
+    jobs::reorder(&mut db.0.lock().unwrap(), &ids).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn remove_job(db: State<Db>, id: i64) -> Result<(), String> {
+    jobs::remove(&db.0.lock().unwrap(), id).map_err(|e| e.to_string())
+}
+
 // Async, so the dialog blocks a worker thread rather than the window's.
 #[tauri::command]
 async fn choose_library(
@@ -142,7 +158,10 @@ fn main() {
             video,
             clip_file_name,
             save,
-            discard
+            discard,
+            queue,
+            reorder_jobs,
+            remove_job
         ])
         .run(tauri::generate_context!())
         .expect("Shadow Plane failed to start");

@@ -1,4 +1,5 @@
 use crate::clip_name;
+use crate::jobs;
 use crate::library;
 use rusqlite::{Connection, OptionalExtension};
 use serde::{Deserialize, Serialize};
@@ -85,7 +86,7 @@ const VIDEOS: &str = "SELECT s.path, s.size, s.modified_ms, s.duration_s, s.widt
         d.action, (SELECT count(*) FROM clip c WHERE c.decision_source = s.path)
      FROM source s LEFT JOIN decision d ON d.source = s.path";
 
-fn file_of(key: &str) -> &str {
+pub fn file_of(key: &str) -> &str {
     key.rsplit_once('/').map_or(key, |(_, file)| file)
 }
 
@@ -268,6 +269,8 @@ pub fn save(conn: &mut Connection, key: &str, clip: &ClipInput, now: &str) -> Re
             (clip_id, position as i64, key, piece.start_s, piece.end_s),
         )?;
     }
+
+    jobs::queue_clip(&tx, clip_id)?;
 
     Ok(tx.commit()?)
 }

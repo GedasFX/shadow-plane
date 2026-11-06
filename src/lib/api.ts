@@ -28,6 +28,25 @@ export type VideoDetail = Video & { width: number; height: number; fps: number; 
 
 export type ClipInput = { title: string; game: string; great: boolean; best: boolean; pieces: Piece[] };
 
+export type JobStatus = "pending" | "running" | "done" | "failed" | "cancelled";
+
+export type Job = {
+  id: number;
+  status: JobStatus;
+  // The video the clip is cut from.
+  key: string;
+  title: string;
+  game: string;
+  file_name: string;
+  kept_s: number;
+  // The finished file below the library folder.
+  output: string | null;
+  error: string | null;
+};
+
+// `done` holds the last 5 finished or failed, newest first.
+export type Queue = { running: Job | null; pending: Job[]; done: Job[] };
+
 export type Scan = { sources: number; unreadable: number };
 
 // Errors reject with a string: a house code (<entity>.<property>.<rule>) or a message.
@@ -42,6 +61,11 @@ export const video = (key: string) => invoke<VideoDetail | null>("video", { key 
 export const clipFileName = (key: string, clip: ClipInput) => invoke<string>("clip_file_name", { key, clip });
 export const save = (key: string, clip: ClipInput) => invoke<void>("save", { key, clip });
 export const discard = (key: string) => invoke<void>("discard", { key });
+export const queue = () => invoke<Queue>("queue");
+// Every pending job's id, in the new order.
+export const reorderJobs = (ids: number[]) => invoke<void>("reorder_jobs", { ids });
+// Cancels a pending job.
+export const removeJob = (id: number) => invoke<void>("remove_job", { id });
 
 // The `media` protocol. The thumbnail is a 320 px JPEG made on first request, one ffmpeg at a time:
 // load grids lazily.

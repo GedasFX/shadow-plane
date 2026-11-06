@@ -46,6 +46,7 @@ placeholder holds its place in the header).
   header's bottom edge shows the same progress.
 - Clicking the chip opens a popover: **Now** (pause, cancel), **Up next** (drag to reorder,
   remove), **Done** (the last 5, each with play), and "Show all history".
+- A removed job is cancelled and shows nowhere; Done lists only finished and failed jobs. Discarding a video drops its jobs.
 - One job runs at a time: one encode already uses the whole machine.
 
 ## Library
