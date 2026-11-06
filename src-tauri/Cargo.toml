@@ -25,5 +25,9 @@ percent-encoding = "2"
 # Compares a video's copy with the original before the original goes.
 sha1 = "0.10"
 
+# The kill-on-close job every encode joins.
+[target.'cfg(windows)'.dependencies]
+win32job = "2.0.3"
+
 [dev-dependencies]
 tempfile = "3"

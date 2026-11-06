@@ -4,6 +4,11 @@
 mod bin;
 mod clip_name;
 mod db;
+#[allow(dead_code)]
+mod encode_args;
+#[cfg(windows)]
+#[allow(dead_code)]
+mod encoder;
 mod ffmpeg;
 mod files;
 mod jobs;
@@ -11,6 +16,8 @@ mod library;
 mod media;
 mod review;
 mod settings;
+#[allow(dead_code)]
+mod verify;
 
 use rusqlite::Connection;
 use std::path::{Path, PathBuf};
