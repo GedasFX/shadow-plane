@@ -1,6 +1,6 @@
 use crate::ffmpeg::{self, Probe};
+use std::ffi::OsString;
 use std::path::Path;
-use std::process::Command;
 
 const DURATION_TOLERANCE: f64 = 0.02;
 
@@ -11,26 +11,15 @@ pub fn probes(file: &Path, size: (i64, i64), kept_s: f64) -> Result<(), String> 
     shape(probe, size, kept_s)
 }
 
-// Every frame decodes: ffprobe reads only the container and the first frames, so a damaged payload
-// passes `probes`. The exit code alone isn't trusted; any error line fails it.
-pub fn decodes(file: &Path) -> Result<(), String> {
-    let mut ffmpeg = Command::new("ffmpeg");
-    ffmpeg
-        .args(["-v", "error", "-xerror", "-i"])
-        .arg(file)
-        .args(["-f", "null", "-"]);
+// The arguments of the full decode: ffprobe reads only the container and the first frames, so a
+// damaged payload passes `probes`. Run through the `Encoder`; any stderr text fails the check, as the
+// exit code alone isn't trusted.
+pub fn decode_args(file: &Path) -> Vec<OsString> {
+    let mut args: Vec<OsString> = ["-v", "error", "-xerror", "-i"].map(Into::into).into();
+    args.push(file.into());
+    args.extend(["-f", "null", "-", "-progress", "pipe:1", "-nostats"].map(OsString::from));
 
-    let output = ffmpeg::run(ffmpeg).map_err(|e| e.to_string())?;
-    let errors = String::from_utf8_lossy(&output.stderr);
-    if output.status.success() && errors.trim().is_empty() {
-        return Ok(());
-    }
-
-    let first = errors.lines().find(|l| !l.trim().is_empty());
-    Err(first.map_or_else(
-        || format!("ffmpeg exited {}", output.status),
-        str::to_string,
-    ))
+    args
 }
 
 fn shape(probe: Option<Probe>, size: (i64, i64), kept_s: f64) -> Result<(), String> {

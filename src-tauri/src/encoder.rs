@@ -25,9 +25,15 @@ pub struct Encoder {
 }
 
 pub struct Running {
-    child: Arc<Mutex<Child>>,
+    control: Control,
     progress: JoinHandle<()>,
     stderr: JoinHandle<String>,
+}
+
+// Pauses, resumes and kills a running ffmpeg from another thread than the one waiting for it.
+#[derive(Clone)]
+pub struct Control {
+    child: Arc<Mutex<Child>>,
 }
 
 impl Encoder {
@@ -68,7 +74,9 @@ impl Encoder {
         let stderr = child.stderr.take().expect("stderr was piped");
 
         Ok(Running {
-            child: Arc::new(Mutex::new(child)),
+            control: Control {
+                child: Arc::new(Mutex::new(child)),
+            },
             progress: thread::spawn(move || read_progress(stdout, on_progress)),
             stderr: thread::spawn(move || last_lines(stderr)),
         })
@@ -76,6 +84,31 @@ impl Encoder {
 }
 
 impl Running {
+    pub fn control(&self) -> Control {
+        self.control.clone()
+    }
+
+    // Blocks until ffmpeg ends. Ok holds its last stderr lines: with `-v error` any text is a fault
+    // the exit code may not show (a process the job object kills exits 0).
+    pub fn wait(self) -> Result<String, String> {
+        let _ = self.progress.join();
+        let stderr = self.stderr.join().unwrap_or_default();
+        let status = self
+            .control
+            .child
+            .lock()
+            .unwrap()
+            .wait()
+            .map_err(|e| e.to_string())?;
+
+        match status.success() {
+            true => Ok(stderr),
+            false => Err(format!("ffmpeg failed ({status}): {stderr}")),
+        }
+    }
+}
+
+impl Control {
     pub fn pause(&self) -> io::Result<()> {
         self.signal(NtSuspendProcess)
     }
@@ -87,23 +120,6 @@ impl Running {
     // `wait` then reports a failure.
     pub fn kill(&self) -> io::Result<()> {
         self.child.lock().unwrap().kill()
-    }
-
-    // Blocks until ffmpeg ends; an error carries its last stderr lines.
-    pub fn wait(self) -> Result<(), String> {
-        let _ = self.progress.join();
-        let stderr = self.stderr.join().unwrap_or_default();
-        let status = self
-            .child
-            .lock()
-            .unwrap()
-            .wait()
-            .map_err(|e| e.to_string())?;
-
-        match status.success() {
-            true => Ok(()),
-            false => Err(format!("ffmpeg failed ({status}): {stderr}")),
-        }
     }
 
     fn signal(&self, nt: unsafe extern "system" fn(RawHandle) -> i32) -> io::Result<()> {
@@ -206,6 +222,18 @@ mod tests {
         }
     }
 
+    fn decode(file: &Path) -> Result<(), String> {
+        let encoder = Encoder::new().unwrap();
+        let running = encoder
+            .start(&verify::decode_args(file), |_| {})
+            .map_err(|e| e.to_string())?;
+
+        match running.wait()?.trim() {
+            "" => Ok(()),
+            errors => Err(errors.to_string()),
+        }
+    }
+
     fn encode_and_check(pieces: &[Piece]) {
         let folder = tempfile::tempdir().unwrap();
         let file = make_source(folder.path(), 4, "320x180");
@@ -228,7 +256,7 @@ mod tests {
         running.wait().unwrap();
         let kept: f64 = pieces.iter().map(|p| p.end_s - p.start_s).sum();
         verify::probes(&output, encode_args::output_size(320, 180), kept).unwrap();
-        verify::decodes(&output).unwrap();
+        assert_eq!(decode(&output), Ok(()));
         assert!(seen.load(Ordering::SeqCst) > 0);
     }
 
@@ -263,7 +291,7 @@ mod tests {
         bytes[from..from + 2000].fill(0xAB);
         std::fs::write(&file, bytes).unwrap();
 
-        assert!(verify::decodes(&file).is_err());
+        assert!(decode(&file).is_err());
     }
 
     #[test]
@@ -291,16 +319,17 @@ mod tests {
         };
 
         until(&|| written.load(Ordering::SeqCst) > 0);
-        running.pause().unwrap();
+        let control = running.control();
+        control.pause().unwrap();
         thread::sleep(Duration::from_millis(500));
         let paused_at = written.load(Ordering::SeqCst);
         thread::sleep(Duration::from_millis(1500));
         assert_eq!(written.load(Ordering::SeqCst), paused_at);
 
-        running.resume().unwrap();
+        control.resume().unwrap();
         until(&|| written.load(Ordering::SeqCst) > paused_at);
 
-        running.kill().unwrap();
+        control.kill().unwrap();
         assert!(running.wait().is_err());
     }
 }
