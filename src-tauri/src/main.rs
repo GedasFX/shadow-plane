@@ -22,6 +22,7 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use tauri::{Emitter, Manager, State};
 use tauri_plugin_dialog::DialogExt;
+use tauri_plugin_opener::OpenerExt;
 use tauri_plugin_updater::UpdaterExt;
 use worker::{Event, Worker};
 
@@ -147,6 +148,20 @@ fn cancel_job(worker: State<Worker>, id: i64) -> Result<(), String> {
     worker.cancel(id)
 }
 
+// A done job's file, in the default video player.
+#[tauri::command]
+fn play(app: tauri::AppHandle, db: State<Db>, id: i64) -> Result<(), String> {
+    let conn = db.0.lock().unwrap();
+    let root = settings::get(&conn, settings::LIBRARY).map_err(|e| e.to_string())?;
+    let root = root.ok_or("No library folder chosen yet")?;
+    let path = jobs::output_path(&conn, Path::new(&root), id).map_err(|e| e.to_string())?;
+    drop(conn);
+
+    app.opener()
+        .open_path(path.to_string_lossy(), None::<&str>)
+        .map_err(|e| e.to_string())
+}
+
 // Async, so the dialog blocks a worker thread rather than the window's.
 #[tauri::command]
 async fn choose_library(
@@ -184,6 +199,7 @@ async fn scan(app: tauri::AppHandle) -> Result<library::Scan, String> {
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         // Library videos and their thumbnails for the page, read on a thread meant for blocking work.
         .register_asynchronous_uri_scheme_protocol("media", |ctx, request, responder| {
@@ -236,7 +252,8 @@ fn main() {
             remove_job,
             pause,
             resume,
-            cancel_job
+            cancel_job,
+            play
         ])
         .run(tauri::generate_context!())
         .expect("Shadow Plane failed to start");

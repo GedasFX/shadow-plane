@@ -4,6 +4,7 @@ use crate::library;
 use crate::review::{Error, Piece, file_of};
 use rusqlite::{Connection, OptionalExtension};
 use serde::Serialize;
+use std::path::{Path, PathBuf};
 
 #[derive(Debug, PartialEq, Serialize)]
 pub struct Job {
@@ -108,6 +109,14 @@ pub fn get(conn: &Connection, id: i64) -> rusqlite::Result<Option<Job>> {
     Ok(jobs(conn, &format!("WHERE j.id = {id}"))?
         .into_iter()
         .next())
+}
+
+// A done job's file below the library folder; an error code when the job has none.
+pub fn output_path(conn: &Connection, root: &Path, id: i64) -> Result<PathBuf, Error> {
+    let job = get(conn, id)?.ok_or(Error::Invalid("job.id.unknown"))?;
+    let output = job.output.ok_or(Error::Invalid("job.output.missing"))?;
+
+    Ok(root.join(output))
 }
 
 // The first pending job by position becomes running, in the one statement that finds it.
@@ -302,6 +311,26 @@ mod tests {
         assert!(first.file_name.contains("one"));
         assert_eq!((&first.output, &first.error), (&None, &None));
         assert!(q.running.is_none() && q.done.is_empty());
+    }
+
+    #[test]
+    fn output_path_is_the_done_file_below_the_library() {
+        let mut conn = library();
+        save(&mut conn, "a", &[(1.0, 2.0)]);
+        let id = ids(&conn)[0];
+
+        let pending = output_path(&conn, Path::new("Z:/Clips"), id);
+        assert!(matches!(pending, Err(Error::Invalid("job.output.missing"))));
+        let unknown = output_path(&conn, Path::new("Z:/Clips"), id + 1);
+        assert!(matches!(unknown, Err(Error::Invalid("job.id.unknown"))));
+
+        conn.execute(
+            "UPDATE job SET status = 'done', output = '_Processed/PEAK/a.mp4' WHERE id = ?1",
+            [id],
+        )
+        .unwrap();
+        let path = output_path(&conn, Path::new("Z:/Clips"), id).unwrap();
+        assert_eq!(path, Path::new("Z:/Clips/_Processed/PEAK/a.mp4"));
     }
 
     #[test]
