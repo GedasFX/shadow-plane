@@ -68,6 +68,10 @@ saved clips, or a bin icon (dimmed) for a discarded video.
   and drags the visible window. The wheel listener isn't passive and WebView2's own zoom is off, or
   the page zooms instead.
 - A fresh video's clip is the whole video, green end to end.
+- Pieces: numbered when there are several, a grip at each end; ends snap to whole frames, a piece
+  is at least 0.5 s, and an end can't pass the next piece in time. Saved clips of the video show
+  hatched grey.
+- Keys, in tooltips only: Space play/pause, Left and Right a frame, I Start here, O End here.
 - **Right column**, always shown, top to bottom:
   1. the clip's length, Great, Best;
   2. title (required: Save without one marks it red), game (amber when the folder is Base Profile);

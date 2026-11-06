@@ -23,6 +23,7 @@ function app(handlers: Record<string, () => unknown> = {}) {
     if (cmd === "plugin:app|version") return "1.2.3";
     if (cmd === "library") return "Z:\\Shadowplays";
     if (cmd === "videos") return [video];
+    if (cmd === "video") return { ...video, width: 1920, height: 1080, fps: 60, clips: [] };
     return handlers[cmd]?.();
   });
 
@@ -63,7 +64,7 @@ test("clicking a video opens it in Review", async () => {
   render(Page);
   await fireEvent.click(await screen.findByTitle("a.mp4"));
   expect(screen.getByRole("button", { name: "Review" }).getAttribute("aria-current")).toBe("page");
-  expect(screen.getByText("PEAK/a.mp4")).toBeTruthy();
+  expect(await screen.findByRole("button", { name: "Play" })).toBeTruthy();
 });
 
 test("Review with no video open says so", async () => {
