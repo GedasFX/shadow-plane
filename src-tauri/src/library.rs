@@ -1,7 +1,7 @@
 use crate::ffmpeg::Probe;
 use rusqlite::Connection;
 use serde::Serialize;
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::fs;
 use std::io;
@@ -17,21 +17,6 @@ const PROBES_AT_ONCE: usize = 8;
 pub struct Scan {
     pub sources: usize,
     pub unreadable: usize,
-}
-
-#[derive(Debug, PartialEq, Serialize)]
-pub struct Game {
-    pub name: String,
-    pub sources: Vec<Source>,
-}
-
-#[derive(Debug, PartialEq, Serialize)]
-pub struct Source {
-    pub path: String,
-    pub name: String,
-    pub duration_s: f64,
-    pub height: i64,
-    pub decision: Option<String>,
 }
 
 struct File {
@@ -177,40 +162,6 @@ pub fn game(key: &str) -> String {
     key.split_once('/')
         .map_or("Misc", |(game, _)| game)
         .to_owned()
-}
-
-// The indexed sources by game folder, each with its decision.
-pub fn games(conn: &Connection) -> rusqlite::Result<Vec<Game>> {
-    let mut rows = conn.prepare(
-        "SELECT s.path, s.duration_s, s.height, d.action
-         FROM source s LEFT JOIN decision d ON d.source = s.path
-         ORDER BY s.path",
-    )?;
-    let rows = rows.query_map([], |row| {
-        Ok(Source {
-            path: row.get(0)?,
-            name: String::new(),
-            duration_s: row.get(1)?,
-            height: row.get(2)?,
-            decision: row.get(3)?,
-        })
-    })?;
-
-    let mut games: BTreeMap<String, Vec<Source>> = BTreeMap::new();
-    for source in rows {
-        let mut source = source?;
-        let name = source
-            .path
-            .split_once('/')
-            .map_or(&*source.path, |(_, name)| name);
-        source.name = name.to_owned();
-        games.entry(game(&source.path)).or_default().push(source);
-    }
-
-    let games = games
-        .into_iter()
-        .map(|(name, sources)| Game { name, sources });
-    Ok(games.collect())
 }
 
 #[cfg(test)]
@@ -375,54 +326,5 @@ mod tests {
 
         assert_eq!(failed.to_string(), "FFmpeg isn't installed");
         assert_eq!(paths(&db), ["PEAK/a.mp4"]);
-    }
-
-    #[test]
-    fn the_list_groups_sources_by_game_folder_with_their_decisions() {
-        let conn = db::memory();
-        conn.execute_batch(
-            "INSERT INTO source VALUES ('PEAK/b.mp4', 1, 1, 90.5, 2560, 1440, 60);
-             INSERT INTO source VALUES ('PEAK/a.mp4', 1, 1, 60, 1920, 1080, 60);
-             INSERT INTO source VALUES ('Minecraft/2024/c.mp4', 1, 1, 30, 2560, 1440, 60);
-             INSERT INTO source VALUES ('d.mp4', 1, 1, 10, 1280, 720, 60);
-             INSERT INTO decision (source, action, decided_at) VALUES ('PEAK/b.mp4', 'skip', '2026-11-05');
-             INSERT INTO decision (source, action, decided_at) VALUES ('Gone/e.mp4', 'queue', '2026-11-05');",
-        )
-        .unwrap();
-
-        let source = |path: &str, name: &str, duration_s, height, decision: Option<&str>| Source {
-            path: path.into(),
-            name: name.into(),
-            duration_s,
-            height,
-            decision: decision.map(String::from),
-        };
-        let game = |name: &str, sources| Game {
-            name: name.into(),
-            sources,
-        };
-        assert_eq!(
-            games(&conn).unwrap(),
-            [
-                game(
-                    "Minecraft",
-                    vec![source(
-                        "Minecraft/2024/c.mp4",
-                        "2024/c.mp4",
-                        30.0,
-                        1440,
-                        None
-                    )]
-                ),
-                game("Misc", vec![source("d.mp4", "d.mp4", 10.0, 720, None)]),
-                game(
-                    "PEAK",
-                    vec![
-                        source("PEAK/a.mp4", "a.mp4", 60.0, 1080, None),
-                        source("PEAK/b.mp4", "b.mp4", 90.5, 1440, Some("skip")),
-                    ]
-                ),
-            ]
-        );
     }
 }

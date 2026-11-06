@@ -49,11 +49,6 @@ fn library(db: State<Db>) -> Result<Option<String>, String> {
 }
 
 #[tauri::command]
-fn games(db: State<Db>) -> Result<Vec<library::Game>, String> {
-    library::games(&db.0.lock().unwrap()).map_err(|e| e.to_string())
-}
-
-#[tauri::command]
 fn videos(db: State<Db>) -> Result<Vec<review::Video>, String> {
     review::videos(&db.0.lock().unwrap()).map_err(|e| e.to_string())
 }
@@ -143,7 +138,6 @@ fn main() {
             library,
             choose_library,
             scan,
-            games,
             videos,
             video,
             clip_file_name,
