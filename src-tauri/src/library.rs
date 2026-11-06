@@ -7,6 +7,7 @@ use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::thread;
 use std::time::UNIX_EPOCH;
 
@@ -31,8 +32,7 @@ pub fn scan<F>(db: &Mutex<Connection>, root: &Path, probe: F) -> Result<Scan, Bo
 where
     F: Fn(&Path) -> io::Result<Option<Probe>> + Sync,
 {
-    let mut files = Vec::new();
-    walk(root, root, &mut files)?;
+    let files = mp4s(root)?;
     let indexed = indexed(&db.lock().unwrap())?;
 
     let on_disk: HashSet<&str> = files.iter().map(|f| f.key.as_str()).collect();
@@ -54,6 +54,14 @@ where
         sources: files.len() - unreadable,
         unreadable,
     })
+}
+
+// Folder by folder, A to Z, as the Library lists them.
+fn mp4s(root: &Path) -> io::Result<Vec<File>> {
+    let mut files = Vec::new();
+    walk(root, root, &mut files)?;
+    files.sort_by_cached_key(|f| f.key.to_lowercase());
+    Ok(files)
 }
 
 // Every .mp4 below dir; folders starting with _ hold the app's own output, so they are skipped.
@@ -107,21 +115,20 @@ fn indexed(conn: &Connection) -> rusqlite::Result<HashMap<String, (i64, i64)>> {
     rows.collect()
 }
 
-// Each thread probes its own share of the files and stores each one as it lands, so the page can
-// list them while the scan runs; returns how many were unreadable.
+// The threads take the files in order and store each as it lands, so the page lists them while the
+// scan runs, a folder finished before the next starts; returns how many were unreadable.
 fn probe_all<F>(db: &Mutex<Connection>, files: &[&File], probe: &F) -> io::Result<usize>
 where
     F: Fn(&Path) -> io::Result<Option<Probe>> + Sync,
 {
-    let share = files.len().div_ceil(PROBES_AT_ONCE).max(1);
+    let next = AtomicUsize::new(0);
 
     thread::scope(|s| {
-        let threads: Vec<_> = files
-            .chunks(share)
-            .map(|part| {
-                s.spawn(move || {
+        let threads: Vec<_> = (0..PROBES_AT_ONCE.min(files.len()))
+            .map(|_| {
+                s.spawn(|| {
                     let mut unreadable = 0;
-                    for file in part {
+                    while let Some(file) = files.get(next.fetch_add(1, Ordering::Relaxed)) {
                         let video = probe(&file.path)?;
                         unreadable += usize::from(video.is_none());
                         store(db, file, video.as_ref()).map_err(io::Error::other)?;
@@ -247,6 +254,36 @@ mod tests {
                 ("PEAK/a.mp4".into(), 60.0, 1440),
                 ("PEAK/b.MP4".into(), 60.0, 1440),
                 ("d.mp4".into(), 60.0, 1440),
+            ]
+        );
+    }
+
+    #[test]
+    fn the_files_come_folder_by_folder_a_to_z() {
+        let root = library(&[
+            "PEAK/b.mp4",
+            "make way/z.mp4",
+            "PEAK/a.mp4",
+            "Minecraft/d.mp4",
+            "Minecraft/2024/c.mp4",
+            "e.mp4",
+        ]);
+
+        let keys: Vec<_> = mp4s(root.path())
+            .unwrap()
+            .into_iter()
+            .map(|f| f.key)
+            .collect();
+
+        assert_eq!(
+            keys,
+            [
+                "e.mp4",
+                "make way/z.mp4",
+                "Minecraft/2024/c.mp4",
+                "Minecraft/d.mp4",
+                "PEAK/a.mp4",
+                "PEAK/b.mp4"
             ]
         );
     }
