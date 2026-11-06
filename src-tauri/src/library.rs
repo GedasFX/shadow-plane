@@ -108,20 +108,22 @@ fn walk(root: &Path, dir: &Path, files: &mut Vec<File>) -> io::Result<()> {
                 .is_some_and(|ext| ext.eq_ignore_ascii_case("mp4"))
         {
             let meta = entry.metadata()?;
-            let modified = meta
-                .modified()?
-                .duration_since(UNIX_EPOCH)
-                .unwrap_or_default();
             files.push(File {
                 key: key(root, &path),
                 size: meta.len() as i64,
-                modified_ms: modified.as_millis() as i64,
+                modified_ms: modified_ms(&meta)?,
                 path,
             });
         }
     }
 
     Ok(())
+}
+
+pub fn modified_ms(meta: &fs::Metadata) -> io::Result<i64> {
+    let modified = meta.modified()?.duration_since(UNIX_EPOCH);
+
+    Ok(modified.unwrap_or_default().as_millis() as i64)
 }
 
 // The path below the library folder with / between parts, the same on every system.

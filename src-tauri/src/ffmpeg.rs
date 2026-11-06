@@ -51,6 +51,24 @@ pub fn probe(file: &Path) -> io::Result<Option<Probe>> {
     Ok(parse(&output.stdout))
 }
 
+// The video's first frame, 320 px wide, as a JPEG.
+pub fn frame(video: &Path, jpeg: &Path) -> io::Result<()> {
+    let mut ffmpeg = Command::new("ffmpeg");
+    ffmpeg
+        .args(["-v", "error", "-y", "-i"])
+        .arg(video)
+        .args(["-frames:v", "1", "-vf", "scale=320:-2", "-q:v", "5"])
+        .arg(jpeg);
+
+    let output = run(ffmpeg)?;
+    if !output.status.success() {
+        let error = String::from_utf8_lossy(&output.stderr);
+        return Err(io::Error::other(error.into_owned()));
+    }
+
+    Ok(())
+}
+
 fn run(mut tool: Command) -> io::Result<process::Output> {
     // A windowed app's console child opens a console window of its own unless told not to.
     #[cfg(windows)]

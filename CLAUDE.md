@@ -16,6 +16,7 @@ Keep this file current. No changelog — git log is the history.
 | `src-tauri/src/settings.rs` | the `setting` table: the library folder |
 | `src-tauri/src/library.rs` | the scan: the library's `.mp4` files into the `source` index, probing only new and changed files; the list by game folder (`Misc` outside any) |
 | `src-tauri/src/ffmpeg.rs` | FFmpeg's tools, found on `PATH`, run without a console window: a video's length, size and frame rate |
+| `src-tauri/src/media.rs` | the `media` protocol: a library video in byte ranges (only below the library folder) and its thumbnail, made by ffmpeg and cached by key, size and modified time; the page's URLs are `convertFileSrc("video/" + key, "media")` and `"thumb/" + key` |
 | `src-tauri/tauri.conf.json` | the window; the per-user NSIS installer; the updater (public key, GitHub's `latest.json`) |
 | `.github/workflows/release.yml` | a `v*` tag publishes the release; a manual run builds without publishing |
 | `scripts/win.sh` | from WSL, the Rust side with the Windows toolchain: `fmt`, `check`, `test`, `build` |
@@ -34,7 +35,8 @@ release at launch and update themselves.
 
 ## Invariants
 
-- The page reaches Rust only through Tauri commands and events: no local server, no port.
+- The page reaches Rust only through Tauri commands, events and the `media` protocol: no local
+  server, no port.
 - The updater signing key (Actions secrets `TAURI_SIGNING_PRIVATE_KEY` and its password) never
   changes: installed copies refuse a release signed with any other key. A backup is kept outside the
   repo.

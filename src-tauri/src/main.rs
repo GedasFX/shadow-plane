@@ -5,17 +5,21 @@ mod clip_name;
 mod db;
 mod ffmpeg;
 mod library;
+mod media;
 mod review;
 mod settings;
 
 use rusqlite::Connection;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 use tauri::{Manager, State};
 use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_updater::UpdaterExt;
 
 struct Db(Mutex<Connection>);
+
+// The cache folder of the library's thumbnails.
+struct Thumbnails(PathBuf);
 
 // Held through a scan: a second scan waits, then works from the first one's index and the latest folder.
 struct Scanning(Mutex<()>);
@@ -112,12 +116,26 @@ fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
+        // Library videos and their thumbnails for the page, read on a thread meant for blocking work.
+        .register_asynchronous_uri_scheme_protocol("media", |ctx, request, responder| {
+            let app = ctx.app_handle().clone();
+            tauri::async_runtime::spawn_blocking(move || {
+                let db = app.state::<Db>();
+                let root = settings::get(&db.0.lock().unwrap(), settings::LIBRARY);
+                let root = root.ok().flatten();
+
+                let cache = &app.state::<Thumbnails>().0;
+                let root = root.as_deref().map(Path::new);
+                responder.respond(media::respond(root, cache, &request, ffmpeg::frame));
+            });
+        })
         .setup(|app| {
             let dir = app.path().app_data_dir()?;
             std::fs::create_dir_all(&dir)?;
             let conn = db::open(&dir.join("shadow-plane.db"))?;
             app.manage(Db(Mutex::new(conn)));
             app.manage(Scanning(Mutex::new(())));
+            app.manage(Thumbnails(app.path().app_cache_dir()?.join("thumbnails")));
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
