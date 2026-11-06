@@ -1,6 +1,9 @@
-import type { Piece } from "./api";
+import type { ClipInput, Piece } from "./api";
 
 export type Clip = { pieces: Piece[]; selected: number };
+
+// What a clip carries besides its pieces; the game starts as the video's folder.
+export type Meta = Omit<ClipInput, "pieces">;
 
 export const MIN_PIECE = 0.5;
 
@@ -84,3 +87,7 @@ function replace(clip: Clip, i: number, piece: Piece): Clip {
 
   return { ...clip, pieces };
 }
+
+export const freshMeta = (game: string): Meta => ({ title: "", game, great: false, best: false });
+
+export const clipInput = (meta: Meta, clip: Clip): ClipInput => ({ ...meta, pieces: clip.pieces });

@@ -38,6 +38,8 @@ placeholder holds its place in the header).
 - The mascot, then the tabs **Library · Review · History**.
 - On Review: `‹ ›` between videos, the game and the video's date, length and size; "3 of 40 to
   review" on the right. Moving on without saving is how a video is left for later.
+  `‹ ›` walk the to-review videos in the Library's order (games A–Z, then path), whatever its
+  filters, and dim at the ends; from a video that isn't to review the right side reads "M to review".
 - The job chip, right-aligned and a fixed 176 px wide so nothing moves: a progress ring, the phase
   as an icon (encode, check quality, paused, all saved, idle), the percentage and the time left in
   fixed-width boxes, `+N` waiting, a red count when a job failed. A 2 px green line along the
@@ -83,7 +85,8 @@ saved clips, or a bin icon (dimmed) for a discarded video.
   6. the file name it will be saved as;
   7. **Discard** (asks first: "It moves to the _Bin folder.") and **Save**, a split button: Save
      and continue (the click; opens the next video) or Save and make another (stays, starts a new
-     whole-video clip, the saved range hatched grey).
+     whole-video clip, the saved range hatched grey; title, game and labels start over). With no video
+     left to review, the Library shows. A toast says what happened.
 
 ## History
 

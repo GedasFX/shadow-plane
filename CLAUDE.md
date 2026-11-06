@@ -13,9 +13,10 @@ Keep this file current. No changelog — git log is the history.
 | `src/app.css` | the design's tokens as CSS custom properties, the font stacks, base button and focus styles |
 | `src/lib/api.ts` | the page's contract with Rust: one typed wrapper per command, the types they return, the `media` URL helpers; read this, not `main.rs` |
 | `src/lib/library.ts` | the Library's pure logic: filters, search, counts, grouping, formatting |
+| `src/lib/videos.svelte.ts` | the videos index shared by the Library and the Review header: `store.videos`, `refresh()` after a scan, a Save and a Discard |
 | `src/lib/clip.ts` | the Review's clip: its pieces, the selected one, set an end, split, remove, reorder, the kept length and the play-the-kept-part order; pure |
 | `src/lib/timeline.ts` | the timeline's maths: zoom window, pan, ruler marks, time and frame; pure |
-| `src/lib/` | components (`Header`, `Library`, `GamesFilter`, `VideoCard`, `Review` with its `Player` and `Timeline`); each tested beside it (`*.test.ts`) in happy-dom, Tauri mocked with `mockIPC` |
+| `src/lib/` | components (`Header`, `Library`, `GamesFilter`, `VideoCard`, `Review` with its `Player`, `Timeline` and `ClipColumn`, the right column); each tested beside it (`*.test.ts`) in happy-dom, Tauri mocked with `mockIPC` |
 | `src-tauri/` | the Rust app: `src/main.rs`; `capabilities/` (what the page may call) |
 | `src-tauri/src/db.rs`, `src-tauri/migrations/` | SQLite in the app's data folder; numbered migrations applied at start |
 | `src-tauri/src/settings.rs` | the `setting` table: the library folder |

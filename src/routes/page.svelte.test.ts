@@ -1,10 +1,14 @@
 import { clearMocks, mockConvertFileSrc, mockIPC } from "@tauri-apps/api/mocks";
 import { fireEvent, render, screen } from "@testing-library/svelte";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
+import { store } from "$lib/videos.svelte";
 import Page from "./+page.svelte";
 
 beforeEach(() => mockConvertFileSrc("windows"));
-afterEach(() => clearMocks());
+afterEach(() => {
+  clearMocks();
+  store.videos = [];
+});
 
 const video = {
   key: "PEAK/a.mp4",
@@ -73,4 +77,23 @@ test("Review with no video open says so", async () => {
   await screen.findByTitle("a.mp4");
   await fireEvent.click(screen.getByRole("button", { name: "Review" }));
   expect(screen.getByText("No video open")).toBeTruthy();
+});
+
+test("on Review the header shows the video and walks the to-review videos", async () => {
+  const list = [video, { ...video, key: "PEAK/b.mp4", date: "2025-10-26T10:00:00" }];
+  mockIPC((cmd) => {
+    if (cmd === "library") return "Z:\\Shadowplays";
+    if (cmd === "videos") return list;
+    if (cmd === "video") return { ...list[0], width: 1920, height: 1080, fps: 60, clips: [] };
+  });
+  render(Page);
+  await fireEvent.click(await screen.findByTitle("a.mp4"));
+
+  expect(await screen.findByText("1 of 2 to review")).toBeTruthy();
+  expect(screen.getByText("25 Oct 23:31 · 1:00 · 1.0 GB")).toBeTruthy();
+  expect((screen.getByRole("button", { name: "Previous video" }) as HTMLButtonElement).disabled).toBe(true);
+
+  await fireEvent.click(screen.getByRole("button", { name: "Next video" }));
+  expect(await screen.findByText("2 of 2 to review")).toBeTruthy();
+  expect((screen.getByRole("button", { name: "Next video" }) as HTMLButtonElement).disabled).toBe(true);
 });

@@ -1,7 +1,9 @@
 import { expect, test } from "vitest";
 import {
   type Clip,
+  clipInput,
   freshClip,
+  freshMeta,
   keptLength,
   keptNext,
   MIN_PIECE,
@@ -80,4 +82,9 @@ test("the kept part carries on, then moves to the next piece, then stops", () =>
   expect(keptNext(two, 0, 15, 50)).toBe("carry on");
   expect(keptNext(two, 0, 19.99, 50)).toBe(1);
   expect(keptNext(two, 1, 39.99, 50)).toBe("stop");
+});
+
+test("a fresh clip has no title, no labels and the video's game", () => {
+  expect(freshMeta("PEAK")).toEqual({ title: "", game: "PEAK", great: false, best: false });
+  expect(clipInput(freshMeta("PEAK"), two)).toEqual({ ...freshMeta("PEAK"), pieces: two.pieces });
 });

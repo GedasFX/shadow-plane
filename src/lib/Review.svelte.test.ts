@@ -1,12 +1,16 @@
 import { clearMocks, mockConvertFileSrc, mockIPC } from "@tauri-apps/api/mocks";
 import { fireEvent, render, screen } from "@testing-library/svelte";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
-import type { VideoDetail } from "./api";
+import type { ClipInput, VideoDetail } from "./api";
 import Review from "./Review.svelte";
+import { store } from "./videos.svelte";
 
 beforeEach(() => mockConvertFileSrc("windows"));
 afterEach(() => {
   clearMocks();
+  onopen.mockReset();
+  onnotice.mockReset();
+  store.videos = [];
   vi.useRealTimers();
   vi.restoreAllMocks();
 });
@@ -34,9 +38,15 @@ const detail: VideoDetail = {
   ],
 };
 
-async function open() {
-  mockIPC((cmd) => (cmd === "video" ? detail : undefined));
-  const view = render(Review, { open: "PEAK/a.mp4" });
+type Args = { key: string; clip: ClipInput };
+
+const onopen = vi.fn();
+const onnotice = vi.fn();
+const other = { ...detail, key: "PEAK/b.mp4", status: "review" as const, clips: [], saved_clips: 0 };
+
+async function open(handlers: Record<string, (args: Args) => unknown> = {}) {
+  mockIPC((cmd, args) => (cmd === "video" ? detail : handlers[cmd]?.(args as Args)));
+  const view = render(Review, { open: "PEAK/a.mp4", onopen, onnotice });
   await screen.findByRole("button", { name: "Play" });
   const el = view.container.querySelector("video") as HTMLVideoElement;
   const track = view.container.querySelector(".track") as HTMLElement;
@@ -68,7 +78,7 @@ test("opens a video: its file, one green piece end to end and the saved clip hat
 });
 
 test("with no video open it says so", () => {
-  render(Review, { open: null });
+  render(Review, { open: null, onopen: vi.fn(), onnotice: vi.fn() });
   expect(screen.getByText("No video open")).toBeTruthy();
 });
 
@@ -218,4 +228,143 @@ test("mute silences the video", async () => {
   await fireEvent.click(screen.getByRole("button", { name: "Mute" }));
   expect(el.muted).toBe(true);
   expect(screen.getByRole("button", { name: "Unmute" })).toBeTruthy();
+});
+
+const queue = [detail, other].map(({ clips: _, width, height, fps, ...v }) => v);
+
+async function fill(title = "Ramp") {
+  await fireEvent.input(screen.getByLabelText("Title"), { target: { value: title } });
+}
+
+test("the game starts as the video's folder, amber for Base Profile", async () => {
+  await open();
+  expect((screen.getByLabelText("Game") as HTMLInputElement).value).toBe("PEAK");
+  expect(screen.getByLabelText("Game").classList.contains("amber")).toBe(false);
+
+  await fireEvent.input(screen.getByLabelText("Game"), { target: { value: "Base Profile" } });
+  expect(screen.getByLabelText("Game").classList.contains("amber")).toBe(true);
+});
+
+test("the file name follows the fields, after a pause", async () => {
+  const calls: Args[] = [];
+  await open({
+    clip_file_name: (args) => {
+      calls.push(args);
+
+      return `${args.clip.title}.mp4`;
+    },
+  });
+  await fill("Ramp");
+  await fireEvent.click(screen.getByRole("button", { name: "Best" }));
+  await vi.waitFor(() => expect(screen.getByLabelText("File name").textContent).toBe("Ramp.mp4"));
+  expect(calls.at(-1)?.clip).toMatchObject({ title: "Ramp", best: true, pieces: [{ start_s: 0, end_s: 100 }] });
+});
+
+test("Save without a title marks it red and saves nothing", async () => {
+  const save = vi.fn();
+  await open({ save });
+  await fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+  expect(screen.getByLabelText("Title").getAttribute("aria-invalid")).toBe("true");
+  expect(save).not.toHaveBeenCalled();
+});
+
+test("Save keeps the clip and opens the next video to review", async () => {
+  const save = vi.fn();
+  store.videos = queue;
+  await open({ save, videos: () => [{ ...queue[0], status: "saved" }, queue[1]] });
+  await fill("  Ramp ");
+  await fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+  await vi.waitFor(() => expect(onopen).toHaveBeenCalledWith("PEAK/b.mp4"));
+  expect(save).toHaveBeenCalledWith({
+    key: "PEAK/a.mp4",
+    clip: { title: "  Ramp ", game: "PEAK", great: false, best: false, pieces: [{ start_s: 0, end_s: 100 }] },
+  });
+  expect(onnotice).toHaveBeenCalledWith("saved", "Saved “Ramp”");
+});
+
+test("a failed Save says so and stays", async () => {
+  await open({
+    save: () => {
+      throw "clip.pieces.range";
+    },
+  });
+  await fill();
+  await fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+  await vi.waitFor(() => expect(onnotice).toHaveBeenCalledWith("error", "Couldn't save: clip.pieces.range"));
+  expect(onopen).not.toHaveBeenCalled();
+});
+
+test("with no video left to review, Save opens none", async () => {
+  await open({ save: () => undefined, videos: () => [{ ...queue[0], status: "saved" }] });
+  await fill();
+  await fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+  await vi.waitFor(() => expect(onopen).toHaveBeenCalledWith(null));
+});
+
+test("Save and make another stays, with a fresh clip and the saved range hatched", async () => {
+  let saved = false;
+  const grown = { ...detail, clips: [...detail.clips, { ...detail.clips[0], pieces: [{ start_s: 20, end_s: 30 }] }] };
+  const { container } = await open();
+  mockIPC((cmd) => {
+    if (cmd === "save") saved = true;
+    if (cmd === "video") return saved ? grown : detail;
+    if (cmd === "videos") return [];
+  });
+  await fill();
+  await fireEvent.click(screen.getByRole("button", { name: "More ways to save" }));
+  await fireEvent.click(screen.getByRole("menuitem", { name: "Save and make another" }));
+
+  await vi.waitFor(() => expect(container.querySelectorAll(".saved")).toHaveLength(2));
+  expect((screen.getByLabelText("Title") as HTMLInputElement).value).toBe("");
+  expect(onopen).not.toHaveBeenCalled();
+  expect(onnotice).toHaveBeenCalledWith("saved", "Saved “Ramp”");
+});
+
+test("Discard asks first, then bins the video and opens the next", async () => {
+  const discard = vi.fn();
+  store.videos = queue;
+  await open({ discard, videos: () => [{ ...queue[0], status: "discarded" }, queue[1]] });
+
+  await fireEvent.click(screen.getByRole("button", { name: "Discard this video" }));
+  expect(screen.getByText("It moves to the _Bin folder.")).toBeTruthy();
+  await fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+  expect(discard).not.toHaveBeenCalled();
+
+  await fireEvent.click(screen.getByRole("button", { name: "Discard this video" }));
+  await fireEvent.click(screen.getByRole("button", { name: "Discard" }));
+  await vi.waitFor(() => expect(onopen).toHaveBeenCalledWith("PEAK/b.mp4"));
+  expect(discard).toHaveBeenCalledWith({ key: "PEAK/a.mp4" });
+  expect(onnotice).toHaveBeenCalledWith("discarded", "Discarded 25 Oct 23:31");
+});
+
+test("a piece's menu splits it, and removes one of several", async () => {
+  const { pieces } = await open();
+  await fireEvent.click(screen.getByRole("button", { name: "More" }));
+  expect(screen.queryByRole("menuitem", { name: "Remove" })).toBeNull();
+  await fireEvent.click(screen.getByRole("menuitem", { name: "Split" }));
+  expect(pieces()).toHaveLength(2);
+
+  await fireEvent.click(screen.getAllByRole("button", { name: "More" })[0]);
+  await fireEvent.click(screen.getByRole("menuitem", { name: "Remove" }));
+  expect(pieces()).toHaveLength(1);
+});
+
+test("clicking a piece row selects it; dragging a row reorders", async () => {
+  await open();
+  await fireEvent.click(screen.getByRole("button", { name: "More" }));
+  await fireEvent.click(screen.getByRole("menuitem", { name: "Split" }));
+  const rows = () => [...document.querySelectorAll<HTMLElement>("aside .row")];
+  const ranges = () => rows().map((r) => r.querySelector(".range")?.textContent);
+  const before = ranges();
+
+  await fireEvent.click(screen.getByRole("button", { name: "Piece 1" }));
+  expect(rows()[0].classList.contains("selected")).toBe(true);
+
+  await fireEvent.dragStart(rows()[0]);
+  await fireEvent.drop(rows()[1]);
+  expect(ranges()).toEqual([before[1], before[0]]);
 });
