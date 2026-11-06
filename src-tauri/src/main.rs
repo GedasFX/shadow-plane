@@ -3,7 +3,7 @@
 
 mod clip_name;
 mod db;
-mod ffprobe;
+mod ffmpeg;
 mod library;
 mod review;
 mod settings;
@@ -102,7 +102,7 @@ async fn scan(app: tauri::AppHandle) -> Result<library::Scan, String> {
             settings::get(&db.0.lock().unwrap(), settings::LIBRARY).map_err(|e| e.to_string())?;
         let root = root.ok_or("No library folder chosen yet")?;
 
-        library::scan(&db.0, Path::new(&root), ffprobe::probe).map_err(|e| e.to_string())
+        library::scan(&db.0, Path::new(&root), ffmpeg::probe).map_err(|e| e.to_string())
     });
 
     work.await.map_err(|e| e.to_string())?

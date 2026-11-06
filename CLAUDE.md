@@ -15,7 +15,7 @@ Keep this file current. No changelog — git log is the history.
 | `src-tauri/src/db.rs`, `src-tauri/migrations/` | SQLite in the app's data folder; numbered migrations applied at start |
 | `src-tauri/src/settings.rs` | the `setting` table: the library folder |
 | `src-tauri/src/library.rs` | the scan: the library's `.mp4` files into the `source` index, probing only new and changed files; the list by game folder (`Misc` outside any) |
-| `src-tauri/src/ffprobe.rs` | a video's length and height; ffprobe is found on `PATH` |
+| `src-tauri/src/ffmpeg.rs` | FFmpeg's tools, found on `PATH`, run without a console window: a video's length, size and frame rate |
 | `src-tauri/tauri.conf.json` | the window; the per-user NSIS installer; the updater (public key, GitHub's `latest.json`) |
 | `.github/workflows/release.yml` | a `v*` tag publishes the release; a manual run builds without publishing |
 | `scripts/win.sh` | from WSL, the Rust side with the Windows toolchain: `fmt`, `check`, `test`, `build` |

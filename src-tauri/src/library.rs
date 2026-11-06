@@ -1,4 +1,4 @@
-use crate::ffprobe::Probe;
+use crate::ffmpeg::Probe;
 use rusqlite::Connection;
 use serde::Serialize;
 use std::collections::{BTreeMap, HashMap, HashSet};

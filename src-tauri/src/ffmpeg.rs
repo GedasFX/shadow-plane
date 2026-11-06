@@ -1,7 +1,7 @@
 use serde::Deserialize;
 use std::io;
 use std::path::Path;
-use std::process::Command;
+use std::process::{self, Command};
 
 #[derive(Debug, PartialEq)]
 pub struct Probe {
@@ -46,21 +46,25 @@ pub fn probe(file: &Path) -> io::Result<Option<Probe>> {
         ])
         .arg(file);
 
+    let output = run(ffprobe)?;
+
+    Ok(parse(&output.stdout))
+}
+
+fn run(mut tool: Command) -> io::Result<process::Output> {
     // A windowed app's console child opens a console window of its own unless told not to.
     #[cfg(windows)]
     {
         use std::os::windows::process::CommandExt;
-        ffprobe.creation_flags(CREATE_NO_WINDOW);
+        tool.creation_flags(CREATE_NO_WINDOW);
     }
 
-    let output = match ffprobe.output() {
+    match tool.output() {
         Err(e) if e.kind() == io::ErrorKind::NotFound => {
-            return Err(io::Error::new(e.kind(), "FFmpeg isn't installed"));
+            Err(io::Error::new(e.kind(), "FFmpeg isn't installed"))
         }
-        result => result?,
-    };
-
-    Ok(parse(&output.stdout))
+        result => result,
+    }
 }
 
 // The output decides, not the exit code: a file ffprobe fails on prints no video stream.
