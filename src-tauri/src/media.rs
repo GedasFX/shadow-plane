@@ -64,7 +64,7 @@ fn status(code: StatusCode, body: Vec<u8>) -> Response<Vec<u8>> {
 }
 
 // A binned video is served from _Bin, under the key it had before.
-fn in_bin_if_gone(root: &Path, key: &str, file: PathBuf) -> PathBuf {
+pub fn in_bin_if_gone(root: &Path, key: &str, file: PathBuf) -> PathBuf {
     if file.exists() {
         return file;
     }

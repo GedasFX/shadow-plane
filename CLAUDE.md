@@ -21,13 +21,14 @@ Keep this file current. No changelog — git log is the history.
 | `src-tauri/src/db.rs`, `src-tauri/migrations/` | SQLite in the app's data folder; numbered migrations applied at start |
 | `src-tauri/src/settings.rs` | the `setting` table: the library folder |
 | `src-tauri/src/library.rs` | the scan: the library's `.mp4` files into the `source` index, probing only new and changed files and storing each as it is probed; a video's game folder (`Misc` outside any); `_Bin`'s files are indexed too, flagged `binned`, under the key they had before the move |
-| `src-tauri/src/jobs.rs` | the `job` table: one job per saved clip, queued by `review::save`; the queue for the popover, reorder, remove (pending becomes cancelled) |
+| `src-tauri/src/jobs.rs` | the `job` table: one job per saved clip, queued by `review::save`; the queue for the popover, reorder, remove (pending becomes cancelled), and the worker's claim and finish |
 | `src-tauri/src/bin.rs` | `bin`: moves a video to `_Bin/<key>` and flags its row; discard calls it before recording the decision |
 | `src-tauri/src/files.rs` | `move_file` (rename, else copy + SHA-1 compare + delete) and `copy_verified`; neither overwrites |
 | `src-tauri/src/ffmpeg.rs` | FFmpeg's tools, found on `PATH`, run without a console window: a video's length, size and frame rate; its audio track count and colour tags |
 | `src-tauri/src/encode_args.rs` | `normalise` a clip's pieces and `args`, the ffmpeg arguments for one encode (pure); the recipe lives here |
-| `src-tauri/src/encoder.rs` | `Encoder`, the app's one kill-on-close job; `start` runs ffmpeg below-normal in it with progress, and `Running` pauses, resumes, kills, waits |
-| `src-tauri/src/verify.rs` | the output checks: `probes` (video stream, size, length within 2%) and `decodes` (full decode, any error fails) |
+| `src-tauri/src/encoder.rs` | `Encoder`, the app's one kill-on-close job; `start` runs ffmpeg below-normal in it with progress, and `Running::wait` ends it and its `Control` (cloneable) pauses, resumes, kills; dropping the `Encoder` kills what runs in it |
+| `src-tauri/src/verify.rs` | the output checks: `probes` (video stream, size, length within 2%) and `decode_args` (a full decode, run through the `Encoder`; any stderr text fails it) |
+| `src-tauri/src/worker.rs` | the queue's worker thread, started at launch: claims pending jobs in position order, one at a time (encode, probe, decode check, copy into `_Processed`, then `bin` when all the video's jobs are done); pause, resume, cancel; the `queue-changed` and `job-progress` events. Reaches ffmpeg through the `Tools` trait, so tests use a fake |
 | `src-tauri/src/media.rs` | the `media` protocol: a library video in byte ranges (only below the library folder; a binned video is found in `_Bin`) and its thumbnail, made by ffmpeg and cached by key, size and modified time; the page's URLs are `convertFileSrc("video/" + key, "media")` and `"thumb/" + key` |
 | `src-tauri/tauri.conf.json` | the window; the per-user NSIS installer; the updater (public key, GitHub's `latest.json`) |
 | `.github/workflows/release.yml` | a `v*` tag publishes the release; a manual run builds without publishing |

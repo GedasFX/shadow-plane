@@ -43,14 +43,12 @@ pub struct Colour {
 }
 
 // What an encode's arguments need and the index lacks.
-#[allow(dead_code)]
 #[derive(Debug, PartialEq)]
 pub struct Streams {
     pub audio_tracks: usize,
     pub colour: Colour,
 }
 
-#[allow(dead_code)]
 #[derive(Deserialize)]
 struct Tagged {
     codec_type: Option<String>,
@@ -59,7 +57,6 @@ struct Tagged {
     color_transfer: Option<String>,
 }
 
-#[allow(dead_code)]
 #[derive(Deserialize)]
 struct Tags {
     streams: Vec<Tagged>,
@@ -83,7 +80,6 @@ pub fn probe(file: &Path) -> io::Result<Option<Probe>> {
     Ok(parse(&output.stdout))
 }
 
-#[allow(dead_code)]
 // The audio track count and the first video stream's colour tags.
 pub fn streams(file: &Path) -> io::Result<Streams> {
     let mut ffprobe = Command::new("ffprobe");
@@ -158,7 +154,6 @@ fn parse(json: &[u8]) -> Option<Probe> {
     })
 }
 
-#[allow(dead_code)]
 fn parse_streams(json: &[u8]) -> Option<Streams> {
     let tags: Tags = serde_json::from_slice(json).ok()?;
     let is = |kind: &'static str| move |s: &&Tagged| s.codec_type.as_deref() == Some(kind);

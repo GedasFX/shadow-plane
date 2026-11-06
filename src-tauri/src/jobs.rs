@@ -1,7 +1,8 @@
 use crate::clip_name;
+use crate::ffmpeg::Probe;
 use crate::library;
-use crate::review::{Error, file_of};
-use rusqlite::Connection;
+use crate::review::{Error, Piece, file_of};
+use rusqlite::{Connection, OptionalExtension};
 use serde::Serialize;
 
 #[derive(Debug, PartialEq, Serialize)]
@@ -24,6 +25,8 @@ pub struct Queue {
     pub running: Option<Job>,
     pub pending: Vec<Job>,
     pub done: Vec<Job>,
+    // New jobs wait; the one running, if any, is frozen.
+    pub paused: bool,
 }
 
 const DONE_SHOWN: i64 = 5;
@@ -38,11 +41,11 @@ pub fn queue_clip(conn: &Connection, clip_id: i64) -> rusqlite::Result<()> {
 }
 
 const JOBS: &str = "SELECT j.id, j.status, c.decision_source, c.title, c.game, c.great, c.best,
-        s.modified_ms,
+        coalesce(s.modified_ms, 0),
         (SELECT coalesce(sum(end_s - start_s), 0) FROM segment WHERE clip_id = c.id),
         (SELECT start_s FROM segment WHERE clip_id = c.id ORDER BY position LIMIT 1),
         j.output, j.error
-     FROM job j JOIN clip c ON c.id = j.clip_id JOIN source s ON s.path = c.decision_source";
+     FROM job j JOIN clip c ON c.id = j.clip_id LEFT JOIN source s ON s.path = c.decision_source";
 
 fn job(row: &rusqlite::Row) -> rusqlite::Result<Job> {
     let key: String = row.get(2)?;
@@ -80,7 +83,7 @@ fn jobs(conn: &Connection, filter: &str) -> rusqlite::Result<Vec<Job>> {
     rows.collect()
 }
 
-pub fn queue(conn: &Connection) -> rusqlite::Result<Queue> {
+pub fn queue(conn: &Connection, paused: bool) -> rusqlite::Result<Queue> {
     let running = jobs(
         conn,
         "WHERE j.status = 'running' ORDER BY j.position LIMIT 1",
@@ -97,7 +100,108 @@ pub fn queue(conn: &Connection) -> rusqlite::Result<Queue> {
         running: running.into_iter().next(),
         pending,
         done,
+        paused,
     })
+}
+
+pub fn get(conn: &Connection, id: i64) -> rusqlite::Result<Option<Job>> {
+    Ok(jobs(conn, &format!("WHERE j.id = {id}"))?
+        .into_iter()
+        .next())
+}
+
+// The first pending job by position becomes running, in the one statement that finds it.
+pub fn claim(conn: &Connection) -> rusqlite::Result<Option<i64>> {
+    conn.query_row(
+        "UPDATE job SET status = 'running'
+         WHERE id = (SELECT id FROM job WHERE status = 'pending' ORDER BY position LIMIT 1)
+         RETURNING id",
+        [],
+        |row| row.get(0),
+    )
+    .optional()
+}
+
+// The job's clip, as the video's own time.
+pub fn pieces(conn: &Connection, id: i64) -> rusqlite::Result<Vec<Piece>> {
+    let mut rows = conn.prepare(
+        "SELECT start_s, end_s FROM segment
+         WHERE clip_id = (SELECT clip_id FROM job WHERE id = ?1) ORDER BY position",
+    )?;
+    let pieces = rows.query_map([id], |row| {
+        Ok(Piece {
+            start_s: row.get(0)?,
+            end_s: row.get(1)?,
+        })
+    })?;
+
+    pieces.collect()
+}
+
+// What the index knows of a video; None once it has left the index.
+pub fn source(conn: &Connection, key: &str) -> rusqlite::Result<Option<Probe>> {
+    conn.query_row(
+        "SELECT duration_s, width, height, fps FROM source WHERE path = ?1",
+        [key],
+        |row| {
+            Ok(Probe {
+                duration_s: row.get(0)?,
+                width: row.get(1)?,
+                height: row.get(2)?,
+                fps: row.get(3)?,
+            })
+        },
+    )
+    .optional()
+}
+
+// `status` is done, failed or cancelled.
+pub fn finish(
+    conn: &Connection,
+    id: i64,
+    status: &str,
+    output: Option<&str>,
+    error: Option<&str>,
+    now: &str,
+) -> rusqlite::Result<()> {
+    conn.execute(
+        "UPDATE job SET status = ?2, output = ?3, error = ?4, finished_at = ?5 WHERE id = ?1",
+        (id, status, output, error, now),
+    )?;
+    Ok(())
+}
+
+pub fn set_error(conn: &Connection, id: i64, error: &str) -> rusqlite::Result<()> {
+    conn.execute("UPDATE job SET error = ?2 WHERE id = ?1", (id, error))?;
+    Ok(())
+}
+
+// A job still running at launch was killed by the app's exit.
+pub fn reset_running(conn: &Connection) -> rusqlite::Result<()> {
+    conn.execute(
+        "UPDATE job SET status = 'pending' WHERE status = 'running'",
+        [],
+    )?;
+    Ok(())
+}
+
+pub fn is_running(conn: &Connection, key: &str) -> rusqlite::Result<bool> {
+    conn.query_row(
+        "SELECT EXISTS (SELECT 1 FROM job j JOIN clip c ON c.id = j.clip_id
+         WHERE j.status = 'running' AND c.decision_source = ?1)",
+        [key],
+        |row| row.get(0),
+    )
+}
+
+// Every job of the video is done: a pending, failed or cancelled one keeps the original.
+pub fn all_done(conn: &Connection, key: &str) -> rusqlite::Result<bool> {
+    conn.query_row(
+        "SELECT NOT EXISTS (SELECT 1 FROM job j JOIN clip c ON c.id = j.clip_id
+         WHERE j.status != 'done' AND c.decision_source = ?1)",
+        [key],
+        |row| row.get(0),
+    )
 }
 
 fn pending_ids(conn: &Connection) -> rusqlite::Result<Vec<i64>> {
@@ -189,7 +293,7 @@ mod tests {
         save(&mut conn, "one", &[(1.0, 3.0), (10.0, 14.0)]);
         save(&mut conn, "two", &[(5.0, 6.0)]);
 
-        let q = queue(&conn).unwrap();
+        let q = queue(&conn, false).unwrap();
 
         assert_eq!(titles(&q.pending), ["one", "two"]);
         let first = &q.pending[0];
@@ -210,7 +314,10 @@ mod tests {
 
         reorder(&mut conn, &[c, a, b]).unwrap();
 
-        assert_eq!(titles(&queue(&conn).unwrap().pending), ["c", "a", "b"]);
+        assert_eq!(
+            titles(&queue(&conn, false).unwrap().pending),
+            ["c", "a", "b"]
+        );
     }
 
     #[test]
@@ -242,7 +349,7 @@ mod tests {
 
         remove(&conn, b).unwrap();
 
-        let q = queue(&conn).unwrap();
+        let q = queue(&conn, false).unwrap();
         assert!(q.pending.is_empty() && q.done.is_empty());
         assert_eq!(q.running.unwrap().id, a);
         for id in [a, b] {
@@ -266,7 +373,7 @@ mod tests {
         )
         .unwrap();
 
-        let q = queue(&conn).unwrap();
+        let q = queue(&conn, false).unwrap();
 
         assert_eq!(titles(&q.done), ["c5", "c4", "c3", "c2", "c1"]);
         assert_eq!(q.done[0].error.as_deref(), Some("boom"));
@@ -284,5 +391,49 @@ mod tests {
             .query_row("SELECT count(*) FROM job", [], |row| row.get(0))
             .unwrap();
         assert_eq!(left, 0);
+    }
+
+    #[test]
+    fn a_job_whose_video_left_the_index_stays_in_the_queue() {
+        let mut conn = library();
+        save(&mut conn, "a", &[(1.0, 2.0)]);
+        conn.execute("DELETE FROM source", []).unwrap();
+
+        let q = queue(&conn, false).unwrap();
+
+        assert_eq!(titles(&q.pending), ["a"]);
+        assert!(q.pending[0].file_name.contains("PEAK"));
+    }
+
+    #[test]
+    fn a_claim_takes_the_first_pending_job_once() {
+        let mut conn = library();
+        save(&mut conn, "a", &[(1.0, 2.0)]);
+        save(&mut conn, "b", &[(1.0, 2.0)]);
+        let [a, b] = ids(&conn)[..] else { panic!() };
+        reorder(&mut conn, &[b, a]).unwrap();
+
+        assert_eq!(claim(&conn).unwrap(), Some(b));
+        assert_eq!(claim(&conn).unwrap(), Some(a));
+        assert_eq!(claim(&conn).unwrap(), None);
+        assert_eq!(queue(&conn, false).unwrap().running.unwrap().id, b);
+    }
+
+    #[test]
+    fn a_video_with_a_running_job_is_found_and_one_with_unfinished_jobs_is_not_all_done() {
+        let mut conn = library();
+        save(&mut conn, "a", &[(1.0, 2.0)]);
+        save(&mut conn, "b", &[(1.0, 2.0)]);
+        let id = claim(&conn).unwrap().unwrap();
+        assert!(is_running(&conn, KEY).unwrap());
+        assert!(!is_running(&conn, "other.mp4").unwrap());
+
+        finish(&conn, id, "done", Some("out"), None, "2026-11-06T10:00:00Z").unwrap();
+
+        assert!(!is_running(&conn, KEY).unwrap());
+        assert!(!all_done(&conn, KEY).unwrap());
+        let id = claim(&conn).unwrap().unwrap();
+        finish(&conn, id, "done", Some("out"), None, "2026-11-06T10:00:00Z").unwrap();
+        assert!(all_done(&conn, KEY).unwrap());
     }
 }

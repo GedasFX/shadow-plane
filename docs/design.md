@@ -48,6 +48,11 @@ placeholder holds its place in the header).
   remove), **Done** (the last 5, each with play), and "Show all history".
 - A removed job is cancelled and shows nowhere; Done lists only finished and failed jobs. Discarding a video drops its jobs.
 - One job runs at a time: one encode already uses the whole machine.
+- A job encodes (phase **encode**), then decodes its output in full (**check**), then lands in
+  `_Processed/<game>/<file name>` (` (2)`, ` (3)` when taken; never overwritten). The original goes
+  to `_Bin` once every job of its video is done; a failed, cancelled or pending one keeps it.
+- Pause freezes the running encode and holds the queue; it isn't remembered across a restart.
+  Cancel kills the running job. Discarding a video being encoded is refused.
 
 ## Library
 

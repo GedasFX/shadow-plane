@@ -45,7 +45,15 @@ export type Job = {
 };
 
 // `done` holds the last 5 finished or failed, newest first.
-export type Queue = { running: Job | null; pending: Job[]; done: Job[] };
+export type Queue = { running: Job | null; pending: Job[]; done: Job[]; paused: boolean };
+
+export type JobPhase = "encode" | "check";
+
+// Events the page listens to: `queue-changed` has no payload (call `queue()`); `job-progress` comes at
+// most 4 a second while a job runs. `left_s` is null until there is a rate.
+export type JobProgress = { id: number; phase: JobPhase; done_s: number; kept_s: number; left_s: number | null };
+export const QUEUE_CHANGED = "queue-changed";
+export const JOB_PROGRESS = "job-progress";
 
 export type Scan = { sources: number; unreadable: number };
 
@@ -66,6 +74,11 @@ export const queue = () => invoke<Queue>("queue");
 export const reorderJobs = (ids: number[]) => invoke<void>("reorder_jobs", { ids });
 // Cancels a pending job.
 export const removeJob = (id: number) => invoke<void>("remove_job", { id });
+// Pause freezes the running encode and holds the queue; resume lets both go on. Neither is remembered across a restart.
+export const pause = () => invoke<void>("pause");
+export const resume = () => invoke<void>("resume");
+// Kills the running job, or removes a pending one.
+export const cancelJob = (id: number) => invoke<void>("cancel_job", { id });
 
 // The `media` protocol. The thumbnail is a 320 px JPEG made on first request, one ffmpeg at a time:
 // load grids lazily.

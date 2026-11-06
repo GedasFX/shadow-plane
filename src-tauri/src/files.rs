@@ -23,9 +23,12 @@ pub fn move_file(from: &Path, to: &Path) -> io::Result<()> {
 pub fn copy_verified(from: &Path, to: &Path) -> io::Result<()> {
     let mut source = File::open(from)?;
     let mut target = OpenOptions::new().write(true).create_new(true).open(to)?;
-    io::copy(&mut source, &mut target)?;
-    target.sync_all()?;
+    let written = io::copy(&mut source, &mut target).and_then(|_| target.sync_all());
     drop(target);
+    if let Err(e) = written {
+        let _ = fs::remove_file(to);
+        return Err(e);
+    }
 
     if sha1_of(from)? != sha1_of(to)? {
         fs::remove_file(to)?;
