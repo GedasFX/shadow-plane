@@ -55,6 +55,7 @@ Search, **To review · Saved · Discarded · All**, and a games filter: multi-se
 search, "All games" first, a video count per game; the button reads All games, the game, or
 "2 games". Below, a grid of thumbnails grouped by game: the length, a green ✓ with the number of
 saved clips, or a bin icon (dimmed) for a discarded video.
+Binned videos (in `_Bin/<Game>/`) stay listed, with thumbnails, playable and clippable; nothing deletes from `_Bin`.
 
 - Starts on To review. Search matches the file name and the game; a game's count follows the status
   filter and search, not the games filter.

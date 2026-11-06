@@ -1,3 +1,4 @@
+use crate::bin;
 use crate::ffmpeg::Probe;
 use rusqlite::Connection;
 use serde::Serialize;
@@ -25,6 +26,7 @@ struct File {
     key: String,
     size: i64,
     modified_ms: i64,
+    binned: bool,
 }
 
 // Brings the source index in line with the library folder: new and changed files are probed, gone ones dropped.
@@ -38,7 +40,7 @@ where
     let on_disk: HashSet<&str> = files.iter().map(|f| f.key.as_str()).collect();
     let todo: Vec<&File> = files
         .iter()
-        .filter(|f| indexed.get(&f.key) != Some(&(f.size, f.modified_ms)))
+        .filter(|f| indexed.get(&f.key) != Some(&(f.size, f.modified_ms, f.binned)))
         .collect();
 
     let mut conn = db.lock().unwrap();
@@ -56,23 +58,33 @@ where
     })
 }
 
-// Folder by folder, A to Z, as the Library lists them.
+// Folder by folder, A to Z, as the Library lists them. _Bin's files come under the key they had
+// before they moved; a key found in place too keeps the one in place.
 fn mp4s(root: &Path) -> io::Result<Vec<File>> {
     let mut files = Vec::new();
-    walk(root, root, &mut files)?;
+    walk(root, root, false, &mut files)?;
+
+    let bin = root.join(bin::FOLDER);
+    if bin.is_dir() {
+        let mut binned = Vec::new();
+        walk(&bin, &bin, true, &mut binned)?;
+        let in_place: HashSet<_> = files.iter().map(|f| f.key.clone()).collect();
+        files.extend(binned.into_iter().filter(|f| !in_place.contains(&f.key)));
+    }
+
     files.sort_by_cached_key(|f| f.key.to_lowercase());
     Ok(files)
 }
 
 // Every .mp4 below dir; folders starting with _ hold the app's own output, so they are skipped.
-fn walk(root: &Path, dir: &Path, files: &mut Vec<File>) -> io::Result<()> {
+fn walk(root: &Path, dir: &Path, binned: bool, files: &mut Vec<File>) -> io::Result<()> {
     for entry in fs::read_dir(dir)? {
         let entry = entry?;
         let path = entry.path();
         let kind = entry.file_type()?;
 
         if kind.is_dir() && !entry.file_name().to_string_lossy().starts_with('_') {
-            walk(root, &path, files)?;
+            walk(root, &path, binned, files)?;
         } else if kind.is_file()
             && path
                 .extension()
@@ -83,6 +95,7 @@ fn walk(root: &Path, dir: &Path, files: &mut Vec<File>) -> io::Result<()> {
                 key: key(root, &path),
                 size: meta.len() as i64,
                 modified_ms: modified_ms(&meta)?,
+                binned,
                 path,
             });
         }
@@ -108,9 +121,11 @@ fn key(root: &Path, path: &Path) -> String {
     parts.join("/")
 }
 
-fn indexed(conn: &Connection) -> rusqlite::Result<HashMap<String, (i64, i64)>> {
-    let mut rows = conn.prepare("SELECT path, size, modified_ms FROM source")?;
-    let rows = rows.query_map([], |row| Ok((row.get(0)?, (row.get(1)?, row.get(2)?))))?;
+fn indexed(conn: &Connection) -> rusqlite::Result<HashMap<String, (i64, i64, bool)>> {
+    let mut rows = conn.prepare("SELECT path, size, modified_ms, binned FROM source")?;
+    let rows = rows.query_map([], |row| {
+        Ok((row.get(0)?, (row.get(1)?, row.get(2)?, row.get(3)?)))
+    })?;
 
     rows.collect()
 }
@@ -155,8 +170,8 @@ fn store(db: &Mutex<Connection>, file: &File, video: Option<&Probe>) -> rusqlite
         return Ok(());
     };
     conn.execute(
-        "INSERT OR REPLACE INTO source (path, size, modified_ms, duration_s, width, height, fps)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+        "INSERT OR REPLACE INTO source (path, size, modified_ms, duration_s, width, height, fps, binned)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
         (
             &file.key,
             file.size,
@@ -165,6 +180,7 @@ fn store(db: &Mutex<Connection>, file: &File, video: Option<&Probe>) -> rusqlite
             video.width,
             video.height,
             video.fps,
+            file.binned,
         ),
     )?;
     Ok(())
@@ -256,6 +272,55 @@ mod tests {
                 ("d.mp4".into(), 60.0, 1440),
             ]
         );
+    }
+
+    #[test]
+    fn the_scan_indexes_bin_under_the_key_before_the_move_and_flags_it() {
+        let root = library(&[
+            "PEAK/a.mp4",
+            "_Bin/PEAK/b.mp4",
+            "_Bin/PEAK/a.mp4",
+            "_Bin/_Old/c.mp4",
+        ]);
+        let db = Mutex::new(db::memory());
+
+        scan(&db, root.path(), probe).unwrap();
+
+        let conn = db.lock().unwrap();
+        let mut rows = conn
+            .prepare("SELECT path, binned FROM source ORDER BY path")
+            .unwrap();
+        let rows: Vec<(String, bool)> = rows
+            .query_map([], |row| Ok((row.get(0)?, row.get(1)?)))
+            .unwrap()
+            .map(Result::unwrap)
+            .collect();
+        assert_eq!(
+            rows,
+            [("PEAK/a.mp4".into(), false), ("PEAK/b.mp4".into(), true)]
+        );
+    }
+
+    #[test]
+    fn a_video_moved_to_bin_is_probed_again_and_flagged() {
+        let root = library(&["PEAK/a.mp4"]);
+        let db = Mutex::new(db::memory());
+        scan(&db, root.path(), probe).unwrap();
+        fs::create_dir_all(root.path().join("_Bin/PEAK")).unwrap();
+        fs::rename(
+            root.path().join("PEAK/a.mp4"),
+            root.path().join("_Bin/PEAK/a.mp4"),
+        )
+        .unwrap();
+
+        scan(&db, root.path(), probe).unwrap();
+
+        let binned: bool = db
+            .lock()
+            .unwrap()
+            .query_row("SELECT binned FROM source", [], |row| row.get(0))
+            .unwrap();
+        assert!(binned);
     }
 
     #[test]

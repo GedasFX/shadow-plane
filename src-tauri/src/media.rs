@@ -1,4 +1,4 @@
-use crate::library;
+use crate::{bin, library};
 use percent_encoding::percent_decode_str;
 use std::fs::{self, File};
 use std::hash::{DefaultHasher, Hash, Hasher};
@@ -39,6 +39,7 @@ where
     let Some(file) = below(root, key) else {
         return status(StatusCode::FORBIDDEN, Vec::new());
     };
+    let file = in_bin_if_gone(root, key, file);
 
     let served = match kind {
         "video" => video(&file, range),
@@ -62,8 +63,19 @@ fn status(code: StatusCode, body: Vec<u8>) -> Response<Vec<u8>> {
     response
 }
 
+// A binned video is served from _Bin, under the key it had before.
+fn in_bin_if_gone(root: &Path, key: &str, file: PathBuf) -> PathBuf {
+    if file.exists() {
+        return file;
+    }
+
+    below(&root.join(bin::FOLDER), key)
+        .filter(|b| b.exists())
+        .unwrap_or(file)
+}
+
 // The file a key names, if the key stays below the library folder.
-fn below(root: &Path, key: &str) -> Option<PathBuf> {
+pub fn below(root: &Path, key: &str) -> Option<PathBuf> {
     let mut parts = Path::new(key).components();
     let plain = parts.all(|part| matches!(part, Component::Normal(_)));
 
@@ -195,6 +207,23 @@ mod tests {
         assert_eq!(response.headers()[header::CONTENT_RANGE], "bytes 2-5/10");
         assert_eq!(response.headers()[header::CONTENT_TYPE], "video/mp4");
         assert_eq!(response.body(), b"2345");
+    }
+
+    #[test]
+    fn a_binned_video_and_its_thumbnail_are_served_from_bin() {
+        let dir = library();
+        let root = dir.path().join("library");
+        fs::create_dir_all(root.join("_Bin/PEAK")).unwrap();
+        fs::rename(root.join("PEAK/a b.mp4"), root.join("_Bin/PEAK/a b.mp4")).unwrap();
+        let make = |_: &Path, jpeg: &Path| fs::write(jpeg, b"jpeg");
+
+        let video = get("video%2FPEAK%2Fa%20b.mp4", Some("bytes=2-5"));
+        let video = respond(Some(&root), dir.path(), &video, no_ffmpeg);
+        let thumb = get("thumb%2FPEAK%2Fa%20b.mp4", None);
+        let thumb = respond(Some(&root), &dir.path().join("cache"), &thumb, make);
+
+        assert_eq!(video.body(), b"2345");
+        assert_eq!(thumb.status(), StatusCode::OK);
     }
 
     #[test]

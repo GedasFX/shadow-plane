@@ -155,7 +155,7 @@ mod tests {
     fn library() -> Connection {
         let conn = db::memory();
         conn.execute_batch(&format!(
-            "INSERT INTO source VALUES ('{KEY}', 500, 1, 60, 2560, 1440, 59.94);"
+            "INSERT INTO source (path, size, modified_ms, duration_s, width, height, fps) VALUES ('{KEY}', 500, 1, 60, 2560, 1440, 59.94);"
         ))
         .unwrap();
         conn

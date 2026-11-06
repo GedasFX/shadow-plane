@@ -8,6 +8,7 @@ const MIGRATIONS: &[&str] = &[
     include_str!("../migrations/002_source.sql"),
     include_str!("../migrations/003_source_size_clip_labels.sql"),
     include_str!("../migrations/004_job.sql"),
+    include_str!("../migrations/005_source_binned.sql"),
 ];
 
 pub fn open(path: &Path) -> rusqlite::Result<Connection> {

@@ -1,9 +1,11 @@
 // A release build is a windowed app: no console window opens beside it.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod bin;
 mod clip_name;
 mod db;
 mod ffmpeg;
+mod files;
 mod jobs;
 mod library;
 mod media;
@@ -70,10 +72,21 @@ fn save(db: State<Db>, key: String, clip: review::ClipInput) -> Result<(), Strin
     review::save(&mut db.0.lock().unwrap(), &key, &clip, &now).map_err(|e| e.to_string())
 }
 
+// Moves the file to _Bin first, so a move that fails records no decision. A NAS copy can take a while.
 #[tauri::command]
-fn discard(db: State<Db>, key: String) -> Result<(), String> {
-    let now = chrono::Utc::now().to_rfc3339();
-    review::discard(&db.0.lock().unwrap(), &key, &now).map_err(|e| e.to_string())
+async fn discard(app: tauri::AppHandle, key: String) -> Result<(), String> {
+    let work = tauri::async_runtime::spawn_blocking(move || {
+        let db = app.state::<Db>();
+        let root =
+            settings::get(&db.0.lock().unwrap(), settings::LIBRARY).map_err(|e| e.to_string())?;
+        let root = root.ok_or("No library folder chosen yet")?;
+        bin::bin(&db.0, Path::new(&root), &key).map_err(|e| e.to_string())?;
+
+        let now = chrono::Utc::now().to_rfc3339();
+        review::discard(&db.0.lock().unwrap(), &key, &now).map_err(|e| e.to_string())
+    });
+
+    work.await.map_err(|e| e.to_string())?
 }
 
 #[tauri::command]

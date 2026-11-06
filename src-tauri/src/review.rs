@@ -275,7 +275,7 @@ pub fn save(conn: &mut Connection, key: &str, clip: &ClipInput, now: &str) -> Re
     Ok(tx.commit()?)
 }
 
-// Replaces any decision, so the clips saved before go with it. The file move is stage 4's.
+// Replaces any decision, so the clips saved before go with it. The file move is `bin::bin`'s.
 pub fn discard(conn: &Connection, key: &str, now: &str) -> rusqlite::Result<()> {
     conn.execute(
         "INSERT OR REPLACE INTO decision (source, action, decided_at) VALUES (?1, 'reject', ?2)",
@@ -295,8 +295,8 @@ mod tests {
     fn library() -> Connection {
         let conn = db::memory();
         conn.execute_batch(
-            "INSERT INTO source VALUES ('PEAK/PEAK 2024.02.20 - 23.46.01.02.DVR.mp4', 500, 1, 60, 2560, 1440, 59.94);
-             INSERT INTO source VALUES ('loose.mp4', 700, 1, 30, 1920, 1080, 30);",
+            "INSERT INTO source (path, size, modified_ms, duration_s, width, height, fps) VALUES ('PEAK/PEAK 2024.02.20 - 23.46.01.02.DVR.mp4', 500, 1, 60, 2560, 1440, 59.94);
+             INSERT INTO source (path, size, modified_ms, duration_s, width, height, fps) VALUES ('loose.mp4', 700, 1, 30, 1920, 1080, 30);",
         )
         .unwrap();
         conn
