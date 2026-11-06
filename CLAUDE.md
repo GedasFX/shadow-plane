@@ -9,8 +9,11 @@ Keep this file current. No changelog — git log is the history.
 
 | Path | Job |
 |---|---|
-| `src/routes/` | the page: SvelteKit as a single-page app (adapter-static, no SSR) |
-| `src/lib/` | components; each tested beside it (`*.svelte.test.ts`) in happy-dom, Tauri mocked with `mockIPC` |
+| `src/routes/` | the page: SvelteKit as a single-page app (adapter-static, no SSR); `+page.svelte` is the shell (tabs, update check at launch) |
+| `src/app.css` | the design's tokens as CSS custom properties, the font stacks, base button and focus styles |
+| `src/lib/api.ts` | the page's contract with Rust: one typed wrapper per command, the types they return, the `media` URL helpers; read this, not `main.rs` |
+| `src/lib/library.ts` | the Library's pure logic: filters, search, counts, grouping, formatting |
+| `src/lib/` | components (`Header`, `Library`, `GamesFilter`, `VideoCard`, `Review`); each tested beside it (`*.test.ts`) in happy-dom, Tauri mocked with `mockIPC` |
 | `src-tauri/` | the Rust app: `src/main.rs`; `capabilities/` (what the page may call) |
 | `src-tauri/src/db.rs`, `src-tauri/migrations/` | SQLite in the app's data folder; numbered migrations applied at start |
 | `src-tauri/src/settings.rs` | the `setting` table: the library folder |

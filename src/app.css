@@ -1,0 +1,71 @@
+:root {
+  --bg: #0c0e13;
+  --panel: #141822;
+  --raised: #1c212b;
+  --raised-2: #262c38;
+  --line: #2f3542;
+  --text: #e6e9ee;
+  --dim: #8a93a3;
+  --faint: #5d6574;
+  --green: #52c23f;
+  --green-light: #86d977;
+  --green-dark: #13301a;
+  --green-line: #3a8f2c;
+  --red: #ff5b67;
+  --red-text: #ff8a93;
+  --red-dark: #3a1a1e;
+  --amber: #f0b429;
+  --ui: "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
+  --mono: "Cascadia Code", Consolas, monospace;
+  color-scheme: dark;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--ui);
+}
+
+button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+button:hover {
+  filter: brightness(1.2);
+}
+
+input {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+}
+
+input::placeholder {
+  color: var(--faint);
+}
+
+input:focus-visible,
+button:focus-visible {
+  outline: 2px solid var(--green);
+  outline-offset: 1px;
+}
+
+.icon-button {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  background: var(--raised);
+  color: var(--dim);
+}

@@ -53,6 +53,11 @@ search, "All games" first, a video count per game; the button reads All games, t
 "2 games". Below, a grid of thumbnails grouped by game: the length, a green ✓ with the number of
 saved clips, or a bin icon (dimmed) for a discarded video.
 
+- Starts on To review. Search matches the file name and the game; a game's count follows the status
+  filter and search, not the games filter.
+- With no folder chosen only a choose-folder button shows; otherwise a folder icon (tooltip: the path;
+  click: choose again) and a rescan icon sit in the toolbar. The scan runs at launch and after choosing.
+
 ## Review
 
 - **Picture**, then the **controls**: back a frame, play/pause, forward a frame (holding a frame
