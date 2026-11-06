@@ -71,8 +71,17 @@ where
     for (file, video) in todo.iter().zip(&probes) {
         let Some(video) = video else { continue };
         tx.execute(
-            "INSERT INTO source (path, size, modified_ms, duration_s, height) VALUES (?1, ?2, ?3, ?4, ?5)",
-            (&file.key, file.size, file.modified_ms, video.duration_s, video.height),
+            "INSERT INTO source (path, size, modified_ms, duration_s, width, height, fps)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+            (
+                &file.key,
+                file.size,
+                file.modified_ms,
+                video.duration_s,
+                video.width,
+                video.height,
+                video.fps,
+            ),
         )?;
     }
     tx.commit()?;
@@ -219,7 +228,9 @@ mod tests {
     fn probe(file: &Path) -> io::Result<Option<Probe>> {
         let video = Probe {
             duration_s: 60.0,
+            width: 2560,
             height: 1440,
+            fps: 60.0,
         };
         Ok((!file.ends_with("broken.mp4")).then_some(video))
     }
@@ -270,6 +281,23 @@ mod tests {
                 ("d.mp4".into(), 60.0, 1440),
             ]
         );
+    }
+
+    #[test]
+    fn the_scan_keeps_each_videos_width_and_frame_rate() {
+        let root = library(&["PEAK/a.mp4"]);
+        let db = Mutex::new(db::memory());
+
+        scan(&db, root.path(), probe).unwrap();
+
+        let stored: (i64, f64) = db
+            .lock()
+            .unwrap()
+            .query_row("SELECT width, fps FROM source", [], |row| {
+                Ok((row.get(0)?, row.get(1)?))
+            })
+            .unwrap();
+        assert_eq!(stored, (2560, 60.0));
     }
 
     #[test]
@@ -342,10 +370,10 @@ mod tests {
     fn the_list_groups_sources_by_game_folder_with_their_decisions() {
         let conn = db::memory();
         conn.execute_batch(
-            "INSERT INTO source VALUES ('PEAK/b.mp4', 1, 1, 90.5, 1440);
-             INSERT INTO source VALUES ('PEAK/a.mp4', 1, 1, 60, 1080);
-             INSERT INTO source VALUES ('Minecraft/2024/c.mp4', 1, 1, 30, 1440);
-             INSERT INTO source VALUES ('d.mp4', 1, 1, 10, 720);
+            "INSERT INTO source VALUES ('PEAK/b.mp4', 1, 1, 90.5, 2560, 1440, 60);
+             INSERT INTO source VALUES ('PEAK/a.mp4', 1, 1, 60, 1920, 1080, 60);
+             INSERT INTO source VALUES ('Minecraft/2024/c.mp4', 1, 1, 30, 2560, 1440, 60);
+             INSERT INTO source VALUES ('d.mp4', 1, 1, 10, 1280, 720, 60);
              INSERT INTO decision (source, action, decided_at) VALUES ('PEAK/b.mp4', 'skip', '2026-11-05');
              INSERT INTO decision (source, action, decided_at) VALUES ('Gone/e.mp4', 'queue', '2026-11-05');",
         )
