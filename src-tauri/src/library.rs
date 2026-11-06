@@ -456,12 +456,15 @@ mod tests {
         let missing = |_: &Path| {
             Err(io::Error::new(
                 io::ErrorKind::NotFound,
-                "FFmpeg isn't installed",
+                "FFmpeg isn't installed or isn't on PATH",
             ))
         };
         let failed = scan(&db, root.path(), missing).unwrap_err();
 
-        assert_eq!(failed.to_string(), "FFmpeg isn't installed");
+        assert_eq!(
+            failed.to_string(),
+            "FFmpeg isn't installed or isn't on PATH"
+        );
         assert_eq!(paths(&db), ["PEAK/a.mp4"]);
     }
 }
