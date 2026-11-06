@@ -1,11 +1,14 @@
 import { clearMocks, mockConvertFileSrc, mockIPC } from "@tauri-apps/api/mocks";
-import { fireEvent, render, screen } from "@testing-library/svelte";
+import { cleanup, fireEvent, render, screen } from "@testing-library/svelte";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { store } from "$lib/videos.svelte";
 import Page from "./+page.svelte";
 
 beforeEach(() => mockConvertFileSrc("windows"));
-afterEach(() => {
+// The page stops listening a tick after it unmounts, which needs the event mock still there.
+afterEach(async () => {
+  cleanup();
+  await new Promise((done) => setTimeout(done));
   clearMocks();
   store.videos = [];
 });
@@ -22,14 +25,18 @@ const video = {
 
 function app(handlers: Record<string, () => unknown> = {}) {
   const calls: string[] = [];
-  mockIPC((cmd) => {
-    calls.push(cmd);
-    if (cmd === "plugin:app|version") return "1.2.3";
-    if (cmd === "library") return "Z:\\Shadowplays";
-    if (cmd === "videos") return [video];
-    if (cmd === "video") return { ...video, width: 1920, height: 1080, fps: 60, clips: [] };
-    return handlers[cmd]?.();
-  });
+  mockIPC(
+    (cmd) => {
+      calls.push(cmd);
+      if (cmd === "plugin:app|version") return "1.2.3";
+      if (cmd === "library") return "Z:\\Shadowplays";
+      if (cmd === "videos") return [video];
+      if (cmd === "queue") return { running: null, pending: [], done: [], paused: false };
+      if (cmd === "video") return { ...video, width: 1920, height: 1080, fps: 60, clips: [] };
+      return handlers[cmd]?.();
+    },
+    { shouldMockEvents: true },
+  );
 
   return calls;
 }
@@ -81,11 +88,15 @@ test("Review with no video open says so", async () => {
 
 test("on Review the header shows the video and walks the to-review videos", async () => {
   const list = [video, { ...video, key: "PEAK/b.mp4", date: "2025-10-26T10:00:00" }];
-  mockIPC((cmd) => {
-    if (cmd === "library") return "Z:\\Shadowplays";
-    if (cmd === "videos") return list;
-    if (cmd === "video") return { ...list[0], width: 1920, height: 1080, fps: 60, clips: [] };
-  });
+  mockIPC(
+    (cmd) => {
+      if (cmd === "library") return "Z:\\Shadowplays";
+      if (cmd === "videos") return list;
+      if (cmd === "queue") return { running: null, pending: [], done: [], paused: false };
+      if (cmd === "video") return { ...list[0], width: 1920, height: 1080, fps: 60, clips: [] };
+    },
+    { shouldMockEvents: true },
+  );
   render(Page);
   await fireEvent.click(await screen.findByTitle("a.mp4"));
 

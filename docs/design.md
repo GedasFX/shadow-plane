@@ -44,8 +44,12 @@ placeholder holds its place in the header).
   as an icon (encode, check quality, paused, all saved, idle), the percentage and the time left in
   fixed-width boxes, `+N` waiting, a red count when a job failed. A 2 px green line along the
   header's bottom edge shows the same progress.
+- The red count is the failures since the popover was last opened; opening it clears it. Times
+  read `m:ss` (`h:mm:ss` past an hour), percentages are whole numbers.
 - Clicking the chip opens a popover: **Now** (pause, cancel), **Up next** (drag to reorder,
   remove), **Done** (the last 5, each with play), and "Show all history".
+- Paused with nothing running (a cancel while paused), **Now** shows only "Paused" and Resume. A done
+  job's play opens its file in the default video player; a failed one has no file to play.
 - A removed job is cancelled and shows nowhere; Done lists only finished and failed jobs. Discarding a video drops its jobs.
 - One job runs at a time: one encode already uses the whole machine.
 - A job encodes (phase **encode**), then decodes its output in full (**check**), then lands in

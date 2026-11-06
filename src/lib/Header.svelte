@@ -4,6 +4,9 @@
 
 <script lang="ts">
   import type { Video } from "./api";
+  import JobChip from "./JobChip.svelte";
+  import { percent } from "./jobs";
+  import { store } from "./jobs.svelte";
   import { formatDate, formatLength, formatSize, type reviewNav } from "./library";
 
   type Props = {
@@ -17,6 +20,8 @@
   };
 
   let { screen, version, video, nav, onscreen, onstep }: Props = $props();
+
+  const pct = $derived(percent(store.queue, store.progress));
 
   const tabs: { id: Screen; name: string }[] = [
     { id: "library", name: "Library" },
@@ -88,10 +93,15 @@
     <span class="grow"></span>
     <span class="queue">{nav.index ? `${nav.index} of ${nav.total}` : nav.total} to review</span>
   {/if}
+  <JobChip />
+  {#if pct !== null}
+    <div class="line" aria-hidden="true" style="width: {pct}%"></div>
+  {/if}
 </header>
 
 <style>
   header {
+    position: relative;
     flex: none;
     display: flex;
     align-items: center;
@@ -159,6 +169,14 @@
     color: var(--dim);
     font-size: 13px;
     white-space: nowrap;
+  }
+
+  .line {
+    position: absolute;
+    left: 0;
+    bottom: -1px;
+    height: 2px;
+    background: var(--green);
   }
 
   nav button[aria-current="page"] {

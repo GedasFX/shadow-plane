@@ -79,6 +79,8 @@ export const pause = () => invoke<void>("pause");
 export const resume = () => invoke<void>("resume");
 // Kills the running job, or removes a pending one.
 export const cancelJob = (id: number) => invoke<void>("cancel_job", { id });
+// Opens a done job's file in the default video player.
+export const play = (id: number) => invoke<void>("play", { id });
 
 // The `media` protocol. The thumbnail is a 320 px JPEG made on first request, one ffmpeg at a time:
 // load grids lazily.

@@ -4,6 +4,7 @@
   import { update } from "$lib/api";
   import Header, { type Screen } from "$lib/Header.svelte";
   import Library from "$lib/Library.svelte";
+  import { follow } from "$lib/jobs.svelte";
   import { reviewNav } from "$lib/library";
   import Review from "$lib/Review.svelte";
   import { store } from "$lib/videos.svelte";
@@ -32,6 +33,12 @@
   onMount(() => {
     getVersion().then((v) => (version = v));
     update().catch(console.error);
+    const following = follow();
+    following.catch(console.error);
+
+    return () => {
+      following.then((stop) => stop()).catch(() => {});
+    };
   });
 </script>
 

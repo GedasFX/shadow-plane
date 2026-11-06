@@ -14,14 +14,16 @@ Keep this file current. No changelog — git log is the history.
 | `src/lib/api.ts` | the page's contract with Rust: one typed wrapper per command, the types they return, the `media` URL helpers; read this, not `main.rs` |
 | `src/lib/library.ts` | the Library's pure logic: filters, search, counts, grouping, formatting |
 | `src/lib/videos.svelte.ts` | the videos index shared by the Library and the Review header: `store.videos`, `refresh()` after a scan, a Save and a Discard |
+| `src/lib/jobs.svelte.ts` | the job queue shared by the header: `store.queue` and the latest `store.progress`, loaded and kept current by `follow()` (the page starts it) |
+| `src/lib/jobs.ts` | the chip's logic: its phase, percentage, time left, words, the failure count and a drag's new order; pure |
 | `src/lib/clip.ts` | the Review's clip: its pieces, the selected one, set an end, split, remove, reorder, the kept length and the play-the-kept-part order; pure |
 | `src/lib/timeline.ts` | the timeline's maths: zoom window, pan, ruler marks, time and frame; pure |
-| `src/lib/` | components (`Header`, `Library`, `GamesFilter`, `VideoCard`, `Review` with its `Player`, `Timeline` and `ClipColumn`, the right column); each tested beside it (`*.test.ts`) in happy-dom, Tauri mocked with `mockIPC` |
+| `src/lib/` | components (`Header`, `JobChip` (the chip and its popover), `Library`, `GamesFilter`, `VideoCard`, `Review` with its `Player`, `Timeline` and `ClipColumn`, the right column); each tested beside it (`*.test.ts`) in happy-dom, Tauri mocked with `mockIPC` |
 | `src-tauri/` | the Rust app: `src/main.rs`; `capabilities/` (what the page may call) |
 | `src-tauri/src/db.rs`, `src-tauri/migrations/` | SQLite in the app's data folder; numbered migrations applied at start |
 | `src-tauri/src/settings.rs` | the `setting` table: the library folder |
 | `src-tauri/src/library.rs` | the scan: the library's `.mp4` files into the `source` index, probing only new and changed files and storing each as it is probed; a video's game folder (`Misc` outside any); `_Bin`'s files are indexed too, flagged `binned`, under the key they had before the move |
-| `src-tauri/src/jobs.rs` | the `job` table: one job per saved clip, queued by `review::save`; the queue for the popover, reorder, remove (pending becomes cancelled), and the worker's claim and finish |
+| `src-tauri/src/jobs.rs` | the `job` table: one job per saved clip, queued by `review::save`; the queue for the popover, reorder, remove (pending becomes cancelled), a done job's file path (for `play`), and the worker's claim and finish |
 | `src-tauri/src/bin.rs` | `bin`: moves a video to `_Bin/<key>` and flags its row; discard calls it before recording the decision |
 | `src-tauri/src/files.rs` | `move_file` (rename, else copy + SHA-1 compare + delete) and `copy_verified`; neither overwrites |
 | `src-tauri/src/ffmpeg.rs` | FFmpeg's tools, found on `PATH`, run without a console window: a video's length, size and frame rate; its audio track count and colour tags |
