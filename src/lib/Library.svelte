@@ -1,29 +1,29 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { chooseLibrary, library, scan, type Video, videos as listVideos } from "./api";
+  import { chooseLibrary, library, scan } from "./api";
   import GamesFilter from "./GamesFilter.svelte";
   import { type Filter, filters, gameCounts, groupByGame } from "./library";
   import VideoCard from "./VideoCard.svelte";
+  import { refresh, store } from "./videos.svelte";
 
   let { onopen }: { onopen: (key: string) => void } = $props();
 
   // undefined until the saved folder is read; null when none is chosen.
   let folder = $state<string | null>();
-  let videos = $state<Video[]>([]);
   let scanning = $state(false);
   let error = $state<string>();
   let filter = $state<Filter>("review");
   let search = $state("");
   let games = $state<string[]>([]);
 
-  const groups = $derived(groupByGame(videos, { filter, search, games }));
+  const groups = $derived(groupByGame(store.videos, { filter, search, games }));
 
   async function rescan() {
     scanning = true;
     error = undefined;
     try {
       await scan();
-      videos = await listVideos();
+      await refresh();
     } catch (e) {
       error = `Couldn't scan: ${e}`;
     } finally {
@@ -71,7 +71,7 @@
             <button aria-pressed={filter === f.id} onclick={() => (filter = f.id)}>{f.name}</button>
           {/each}
         </div>
-        <GamesFilter games={gameCounts(videos, filter, search)} bind:selected={games} />
+        <GamesFilter games={gameCounts(store.videos, filter, search)} bind:selected={games} />
         <button class="icon-button" title={folder} aria-label="Library folder" onclick={choose}>
           <svg
             aria-hidden="true"

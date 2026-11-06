@@ -3,9 +3,13 @@ import { fireEvent, render, screen } from "@testing-library/svelte";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import type { Video } from "./api";
 import Library from "./Library.svelte";
+import { store } from "./videos.svelte";
 
 beforeEach(() => mockConvertFileSrc("windows"));
-afterEach(() => clearMocks());
+afterEach(() => {
+  clearMocks();
+  store.videos = [];
+});
 
 const video = (key: string, game: string, status: Video["status"], saved_clips = 0): Video => ({
   key,

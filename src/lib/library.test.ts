@@ -1,6 +1,16 @@
 import { expect, test } from "vitest";
 import type { Video } from "./api";
-import { formatDate, formatLength, formatSize, gameCounts, gamesLabel, groupByGame, matching } from "./library";
+import {
+  formatDate,
+  formatLength,
+  formatSize,
+  formatTenths,
+  gameCounts,
+  gamesLabel,
+  groupByGame,
+  matching,
+  reviewNav,
+} from "./library";
 
 const video = (key: string, game: string, status: Video["status"]): Video => ({
   key,
@@ -65,4 +75,28 @@ test("formats lengths, dates and sizes", () => {
   expect(formatDate("2025-10-25T23:31:09")).toBe("25 Oct 23:31");
   expect(formatSize(220e6)).toBe("220 MB");
   expect(formatSize(1.84e9)).toBe("1.8 GB");
+});
+
+test("formats a piece's time with tenths", () => {
+  expect(formatTenths(0.5)).toBe("0:00.5");
+  expect(formatTenths(754.56)).toBe("12:34.5");
+});
+
+test("the review queue runs through games A-Z, then path, whatever the list's order", () => {
+  const list = [
+    video("PEAK/b.mp4", "PEAK", "review"),
+    video("Make Way/b.mp4", "Make Way", "review"),
+    video("Make Way/a.mp4", "Make Way", "saved"),
+    video("PEAK/a.mp4", "PEAK", "review"),
+  ];
+
+  expect(reviewNav(list, "PEAK/a.mp4")).toEqual({ index: 2, total: 3, prev: "Make Way/b.mp4", next: "PEAK/b.mp4" });
+  expect(reviewNav(list, "Make Way/b.mp4")).toMatchObject({ index: 1, prev: null, next: "PEAK/a.mp4" });
+  expect(reviewNav(list, "PEAK/b.mp4").next).toBeNull();
+});
+
+test("from a video that isn't to review, the neighbours are the to-review videos around it", () => {
+  const list = [video("A/a.mp4", "A", "review"), video("A/b.mp4", "A", "saved"), video("A/c.mp4", "A", "review")];
+
+  expect(reviewNav(list, "A/b.mp4")).toEqual({ index: 0, total: 2, prev: "A/a.mp4", next: "A/c.mp4" });
 });

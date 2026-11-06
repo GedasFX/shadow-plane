@@ -70,3 +70,28 @@ export function formatSize(bytes: number) {
 
   return `${Math.round(bytes / 1e6)} MB`;
 }
+
+// "754.56" as "12:34.5".
+export function formatTenths(seconds: number) {
+  const tenths = Math.floor(seconds * 10);
+
+  return `${formatLength(tenths / 10)}.${tenths % 10}`;
+}
+
+const inOrder = (a: Video, b: Video) => a.game.localeCompare(b.game) || (a.key < b.key ? -1 : a.key > b.key ? 1 : 0);
+
+// The to-review queue in the Library's order (games A-Z, then path): where `key` sits in it, 0 when it
+// isn't to review, and the to-review videos either side of it.
+export function reviewNav(videos: Video[], key: string) {
+  const queue = videos.filter((v) => v.status === "review").sort(inOrder);
+  const current = videos.find((v) => v.key === key);
+  const before = current ? queue.filter((v) => inOrder(v, current) < 0) : [];
+  const after = current ? queue.filter((v) => inOrder(v, current) > 0) : queue;
+
+  return {
+    index: queue.findIndex((v) => v.key === key) + 1,
+    total: queue.length,
+    prev: before.at(-1)?.key ?? null,
+    next: after[0]?.key ?? null,
+  };
+}
