@@ -3130,6 +3130,8 @@ dependencies = [
 name = "shadow-plane"
 version = "0.2.0"
 dependencies = [
+ "chrono",
+ "regex",
  "rusqlite",
  "serde",
  "serde_json",

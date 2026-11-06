@@ -1,9 +1,11 @@
 // A release build is a windowed app: no console window opens beside it.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod clip_name;
 mod db;
 mod ffprobe;
 mod library;
+mod review;
 mod settings;
 
 use rusqlite::Connection;
@@ -45,6 +47,33 @@ fn library(db: State<Db>) -> Result<Option<String>, String> {
 #[tauri::command]
 fn games(db: State<Db>) -> Result<Vec<library::Game>, String> {
     library::games(&db.0.lock().unwrap()).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn videos(db: State<Db>) -> Result<Vec<review::Video>, String> {
+    review::videos(&db.0.lock().unwrap()).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn video(db: State<Db>, key: String) -> Result<Option<review::VideoDetail>, String> {
+    review::detail(&db.0.lock().unwrap(), &key).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn clip_file_name(db: State<Db>, key: String, clip: review::ClipInput) -> Result<String, String> {
+    review::clip_file_name(&db.0.lock().unwrap(), &key, &clip).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn save(db: State<Db>, key: String, clip: review::ClipInput) -> Result<(), String> {
+    let now = chrono::Utc::now().to_rfc3339();
+    review::save(&mut db.0.lock().unwrap(), &key, &clip, &now).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn discard(db: State<Db>, key: String) -> Result<(), String> {
+    let now = chrono::Utc::now().to_rfc3339();
+    review::discard(&db.0.lock().unwrap(), &key, &now).map_err(|e| e.to_string())
 }
 
 // Async, so the dialog blocks a worker thread rather than the window's.
@@ -96,7 +125,12 @@ fn main() {
             library,
             choose_library,
             scan,
-            games
+            games,
+            videos,
+            video,
+            clip_file_name,
+            save,
+            discard
         ])
         .run(tauri::generate_context!())
         .expect("Shadow Plane failed to start");
