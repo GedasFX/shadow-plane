@@ -182,3 +182,48 @@ test("a command that fails shows its error", async () => {
 
   expect((await screen.findByRole("alert")).textContent).toBe("job.output.missing");
 });
+
+const boxes = (el: HTMLElement) =>
+  [...el.querySelectorAll(".ring, .num, .badge")].map((n) =>
+    [...n.classList].filter((c) => !c.startsWith("svelte-")).join(" "),
+  );
+
+test("idle renders the icon and label only", () => {
+  app({});
+  const { container } = render(JobChip);
+
+  expect(boxes(container)).toEqual([]);
+  expect(container.querySelector(".label")).not.toBeNull();
+});
+
+test("processing renders the ring and both boxes, and a waiting job adds +N", () => {
+  app({ running: job(1, "running"), pending: [job(2)] });
+  const { container } = render(JobChip);
+
+  expect(boxes(container)).toEqual(["ring", "num", "num dim", "badge wait"]);
+  expect(container.querySelector(".label")).toBeNull();
+});
+
+test("a failure count adds its badge in either state", () => {
+  app({ done: [job(9, "failed")] });
+  const { container } = render(JobChip);
+
+  expect(boxes(container)).toEqual(["badge fail"]);
+});
+
+test("encode, check and paused render the same boxes", () => {
+  const sets: string[][] = [];
+  for (const phase of ["encode", "check"] as const) {
+    app({ running: job(1, "running") });
+    store.progress = { id: 1, phase, done_s: 10, kept_s: 75, left_s: 5 };
+    const { container } = render(JobChip);
+    sets.push(boxes(container));
+    cleanup();
+  }
+  app({ paused: true, pending: [job(2)] });
+  const { container } = render(JobChip);
+  sets.push(boxes(container).filter((b) => b !== "badge wait"));
+
+  expect(sets[1]).toEqual(sets[0]);
+  expect(sets[2]).toEqual(sets[0]);
+});

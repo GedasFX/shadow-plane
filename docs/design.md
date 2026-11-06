@@ -40,10 +40,12 @@ placeholder holds its place in the header).
   review" on the right. Moving on without saving is how a video is left for later.
   `‹ ›` walk the to-review videos in the Library's order (games A–Z, then path), whatever its
   filters, and dim at the ends; from a video that isn't to review the right side reads "M to review".
-- The job chip, right-aligned and a fixed 176 px wide so nothing moves: a progress ring, the phase
+- The job chip, right-aligned and hugging its content, with fixed-width boxes so nothing moves within a state: a progress ring, the phase
   as an icon (encode ▶, check quality, paused, all saved, idle), the percentage and the time left in
   fixed-width boxes, `+N` waiting, a red count when a job failed. With nothing running there is no
-  ring or numbers: the icon and **All saved** or **No jobs** (paused keeps the ring). A 2 px green
+  ring or numbers: the icon and **All saved** or **No jobs** (paused keeps the ring). Idle is the
+  icon and label only; processing (encode, check, paused) is one width, the `+N` and red boxes
+  adding theirs when shown. A 2 px green
   line along the header's bottom edge shows the same progress.
 - The red count is the failures since the popover was last opened; opening it clears it. Times
   read `m:ss` (`h:mm:ss` past an hour), percentages are whole numbers.

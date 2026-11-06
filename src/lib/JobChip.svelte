@@ -84,10 +84,8 @@
       <span class="num">{pct === null ? "" : `${pct}%`}</span>
       <span class="num dim">{now === "paused" ? "" : (left ?? "")}</span>
     {/if}
-    <span class="badges">
-      {#if waiting(q)}<span class="badge">+{waiting(q)}</span>{/if}
-      {#if failed}<span class="badge fail">{failed}</span>{/if}
-    </span>
+    {#if waiting(q)}<span class="badge wait">+{waiting(q)}</span>{/if}
+    {#if failed}<span class="badge fail">{failed}</span>{/if}
   </button>
 
   {#if open}
@@ -218,7 +216,6 @@
     display: flex;
     align-items: center;
     gap: 4px;
-    width: 176px;
     height: 34px;
     padding: 0 6px 0 5px;
     border-radius: 8px;
@@ -248,32 +245,28 @@
   }
 
   .label {
-    flex: 1;
-    min-width: 0;
-    overflow: hidden;
+    padding: 0 3px;
     font-size: 12px;
     white-space: nowrap;
-    text-overflow: ellipsis;
-  }
-
-  .badges {
-    display: flex;
-    flex: 1;
-    justify-content: flex-end;
-    gap: 3px;
-    min-width: 0;
-    overflow: hidden;
   }
 
   .badge {
-    padding: 1px 6px;
+    box-sizing: border-box;
+    flex: none;
+    padding: 1px 0;
+    text-align: center;
     border-radius: 999px;
     background: var(--raised-2);
     font-size: 11px;
     font-weight: 700;
   }
 
+  .badge.wait {
+    width: 2.9em;
+  }
+
   .badge.fail {
+    width: 2.2em;
     background: var(--red-dark);
     color: var(--red-text);
   }
