@@ -20,7 +20,7 @@ Keep this file current. No changelog — git log is the history.
 | `src-tauri/` | the Rust app: `src/main.rs`; `capabilities/` (what the page may call) |
 | `src-tauri/src/db.rs`, `src-tauri/migrations/` | SQLite in the app's data folder; numbered migrations applied at start |
 | `src-tauri/src/settings.rs` | the `setting` table: the library folder |
-| `src-tauri/src/library.rs` | the scan: the library's `.mp4` files into the `source` index, probing only new and changed files; a video's game folder (`Misc` outside any) |
+| `src-tauri/src/library.rs` | the scan: the library's `.mp4` files into the `source` index, probing only new and changed files and storing each as it is probed; a video's game folder (`Misc` outside any) |
 | `src-tauri/src/ffmpeg.rs` | FFmpeg's tools, found on `PATH`, run without a console window: a video's length, size and frame rate |
 | `src-tauri/src/media.rs` | the `media` protocol: a library video in byte ranges (only below the library folder) and its thumbnail, made by ffmpeg and cached by key, size and modified time; the page's URLs are `convertFileSrc("video/" + key, "media")` and `"thumb/" + key` |
 | `src-tauri/tauri.conf.json` | the window; the per-user NSIS installer; the updater (public key, GitHub's `latest.json`) |

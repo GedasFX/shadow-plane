@@ -35,43 +35,21 @@ where
     walk(root, root, &mut files)?;
     let indexed = indexed(&db.lock().unwrap())?;
 
-    let unchanged = |file: &&File| indexed.get(&file.key) == Some(&(file.size, file.modified_ms));
-    let kept: HashSet<&str> = files
-        .iter()
-        .filter(unchanged)
-        .map(|f| f.key.as_str())
-        .collect();
+    let on_disk: HashSet<&str> = files.iter().map(|f| f.key.as_str()).collect();
     let todo: Vec<&File> = files
         .iter()
-        .filter(|f| !kept.contains(f.key.as_str()))
+        .filter(|f| indexed.get(&f.key) != Some(&(f.size, f.modified_ms)))
         .collect();
-    let probes = probe_all(&todo, &probe)?;
 
-    // Write it all at once, and only once every probe has run.
     let mut conn = db.lock().unwrap();
     let tx = conn.transaction()?;
-    for key in indexed.keys().filter(|key| !kept.contains(key.as_str())) {
+    for key in indexed.keys().filter(|key| !on_disk.contains(key.as_str())) {
         tx.execute("DELETE FROM source WHERE path = ?1", [key])?;
     }
-    for (file, video) in todo.iter().zip(&probes) {
-        let Some(video) = video else { continue };
-        tx.execute(
-            "INSERT INTO source (path, size, modified_ms, duration_s, width, height, fps)
-             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
-            (
-                &file.key,
-                file.size,
-                file.modified_ms,
-                video.duration_s,
-                video.width,
-                video.height,
-                video.fps,
-            ),
-        )?;
-    }
     tx.commit()?;
+    drop(conn);
 
-    let unreadable = probes.iter().filter(|video| video.is_none()).count();
+    let unreadable = probe_all(db, &todo, &probe)?;
     Ok(Scan {
         sources: files.len() - unreadable,
         unreadable,
@@ -129,8 +107,9 @@ fn indexed(conn: &Connection) -> rusqlite::Result<HashMap<String, (i64, i64)>> {
     rows.collect()
 }
 
-// Each thread probes its own share of the files; the results come back in the files' order.
-fn probe_all<F>(files: &[&File], probe: &F) -> io::Result<Vec<Option<Probe>>>
+// Each thread probes its own share of the files and stores each one as it lands, so the page can
+// list them while the scan runs; returns how many were unreadable.
+fn probe_all<F>(db: &Mutex<Connection>, files: &[&File], probe: &F) -> io::Result<usize>
 where
     F: Fn(&Path) -> io::Result<Option<Probe>> + Sync,
 {
@@ -141,20 +120,47 @@ where
             .chunks(share)
             .map(|part| {
                 s.spawn(move || {
-                    part.iter()
-                        .map(|file| probe(&file.path))
-                        .collect::<io::Result<Vec<_>>>()
+                    let mut unreadable = 0;
+                    for file in part {
+                        let video = probe(&file.path)?;
+                        unreadable += usize::from(video.is_none());
+                        store(db, file, video.as_ref()).map_err(io::Error::other)?;
+                    }
+                    io::Result::Ok(unreadable)
                 })
             })
             .collect();
 
-        let mut probes = Vec::with_capacity(files.len());
+        let mut unreadable = 0;
         for thread in threads {
-            probes.extend(thread.join().expect("a probe panicked")?);
+            unreadable += thread.join().expect("a probe panicked")?;
         }
 
-        Ok(probes)
+        Ok(unreadable)
     })
+}
+
+// A changed file keeps its old row until its new probe lands, so it never drops out mid-scan.
+fn store(db: &Mutex<Connection>, file: &File, video: Option<&Probe>) -> rusqlite::Result<()> {
+    let conn = db.lock().unwrap();
+    let Some(video) = video else {
+        conn.execute("DELETE FROM source WHERE path = ?1", [&file.key])?;
+        return Ok(());
+    };
+    conn.execute(
+        "INSERT OR REPLACE INTO source (path, size, modified_ms, duration_s, width, height, fps)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+        (
+            &file.key,
+            file.size,
+            file.modified_ms,
+            video.duration_s,
+            video.width,
+            video.height,
+            video.fps,
+        ),
+    )?;
+    Ok(())
 }
 
 // The game folder a video sits in; "Misc" for one outside any folder, as the legacy app had it.
@@ -307,6 +313,35 @@ mod tests {
                 "PEAK/touched.mp4"
             ]
         );
+    }
+
+    #[test]
+    fn a_scan_that_stops_midway_keeps_what_it_probed() {
+        let root = library(&["PEAK/a.mp4", "PEAK/b.mp4", "PEAK/c.mp4"]);
+        let db = Mutex::new(db::memory());
+
+        let crashing_on_b = |file: &Path| {
+            if file.ends_with("b.mp4") {
+                return Err(io::Error::other("FFmpeg crashed"));
+            }
+            probe(file)
+        };
+        scan(&db, root.path(), crashing_on_b).unwrap_err();
+
+        assert_eq!(paths(&db), ["PEAK/a.mp4", "PEAK/c.mp4"]);
+    }
+
+    #[test]
+    fn a_changed_file_that_no_longer_reads_drops_out() {
+        let root = library(&["PEAK/a.mp4"]);
+        let db = Mutex::new(db::memory());
+        scan(&db, root.path(), probe).unwrap();
+        write(&root, "PEAK/a.mp4", b"xy");
+
+        let unreadable = |_: &Path| Ok(None);
+        scan(&db, root.path(), unreadable).unwrap();
+
+        assert!(paths(&db).is_empty());
     }
 
     #[test]
