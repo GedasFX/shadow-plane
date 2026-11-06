@@ -21,12 +21,16 @@
   async function rescan() {
     scanning = true;
     error = undefined;
+    // The stored list shows at once; the scan stores each video as it is probed, so the list grows.
+    const growing = setInterval(refresh, 2000);
     try {
+      await refresh();
       await scan();
       await refresh();
     } catch (e) {
       error = `Couldn't scan: ${e}`;
     } finally {
+      clearInterval(growing);
       scanning = false;
     }
   }

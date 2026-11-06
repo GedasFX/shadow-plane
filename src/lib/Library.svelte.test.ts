@@ -7,6 +7,7 @@ import { store } from "./videos.svelte";
 
 beforeEach(() => mockConvertFileSrc("windows"));
 afterEach(() => {
+  vi.useRealTimers();
   clearMocks();
   store.videos = [];
 });
@@ -28,9 +29,14 @@ const all = [
   video("PEAK/d.mp4", "PEAK", "discarded"),
 ];
 
-type Handlers = { saved?: string | null; picked?: string | null; scan?: () => unknown };
+type Handlers = {
+  saved?: string | null;
+  picked?: string | null;
+  scan?: () => unknown;
+  videos?: () => Video[];
+};
 
-function app(onopen = vi.fn(), { saved = "Z:\\Shadowplays", picked = null, scan }: Handlers = {}) {
+function app(onopen = vi.fn(), { saved = "Z:\\Shadowplays", picked = null, scan, videos = () => all }: Handlers = {}) {
   const calls: string[] = [];
   mockIPC((cmd) => {
     calls.push(cmd);
@@ -42,7 +48,7 @@ function app(onopen = vi.fn(), { saved = "Z:\\Shadowplays", picked = null, scan 
       case "scan":
         return scan ? scan() : { sources: all.length, unreadable: 0 };
       case "videos":
-        return all;
+        return videos();
     }
   });
   render(Library, { onopen });
@@ -127,9 +133,36 @@ test("clicking a video hands its key over", async () => {
 
 test("the rescan button scans again", async () => {
   const calls = app();
-  await screen.findByTitle("a.mp4");
-  await fireEvent.click(screen.getByRole("button", { name: "Rescan" }));
+  const rescan = await screen.findByRole("button", { name: "Rescan" });
+  await vi.waitFor(() => expect(rescan.hasAttribute("disabled")).toBe(false));
+  await fireEvent.click(rescan);
   await vi.waitFor(() => expect(calls.filter((c) => c === "scan")).toHaveLength(2));
+});
+
+test("lists the stored videos before the scan ends", async () => {
+  app(vi.fn(), { scan: () => new Promise(() => {}) });
+  expect(await screen.findByTitle("a.mp4")).toBeTruthy();
+});
+
+test("re-reads the list every 2 s while the scan runs, and stops after", async () => {
+  vi.useFakeTimers({ toFake: ["setInterval", "clearInterval"] });
+  let finish = () => {};
+  const listed = [all[0]];
+  const calls = app(vi.fn(), {
+    scan: () => new Promise<void>((resolve) => (finish = resolve)),
+    videos: () => [...listed],
+  });
+  await screen.findByTitle("a.mp4");
+
+  listed.push(all[2]);
+  await vi.advanceTimersByTimeAsync(2000);
+  expect(await screen.findByTitle("Climb.mp4")).toBeTruthy();
+
+  finish();
+  await vi.waitFor(() => expect(screen.getByRole("button", { name: "Rescan" }).hasAttribute("disabled")).toBe(false));
+  const reads = calls.filter((c) => c === "videos").length;
+  await vi.advanceTimersByTimeAsync(6000);
+  expect(calls.filter((c) => c === "videos")).toHaveLength(reads);
 });
 
 test("says why a scan failed", async () => {

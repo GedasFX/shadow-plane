@@ -58,7 +58,7 @@ saved clips, or a bin icon (dimmed) for a discarded video.
 - Starts on To review. Search matches the file name and the game; a game's count follows the status
   filter and search, not the games filter.
 - With no folder chosen only a choose-folder button shows; otherwise a folder icon (tooltip: the path;
-  click: choose again) and a rescan icon sit in the toolbar. The scan runs at launch and after choosing.
+  click: choose again) and a rescan icon sit in the toolbar. The scan runs at launch and after choosing; the list shows what is indexed at once and grows every 2 s while the scan runs.
 
 ## Review
 
