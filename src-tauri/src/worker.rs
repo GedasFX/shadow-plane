@@ -778,7 +778,6 @@ mod tests {
         let a = s.save(PEAK, "a");
         let b = s.save(PEAK, "b");
         let c = s.save(OTHER, "c");
-        jobs::reorder(&mut s.db.lock().unwrap(), &[c, a, b]).unwrap();
         s.fake.hold.store(true, Ordering::SeqCst);
         s.fake.release.store(true, Ordering::SeqCst);
 
@@ -787,7 +786,7 @@ mod tests {
         until(|| [a, b, c].iter().all(|&id| s.status(id) == "done"));
 
         let order: Vec<String> = s.fake.started.lock().unwrap().clone();
-        assert_eq!(order, [c, a, b].map(|id| id.to_string()));
+        assert_eq!(order, [a, b, c].map(|id| id.to_string()));
         assert_eq!(s.fake.most_live.load(Ordering::SeqCst), 1);
     }
 

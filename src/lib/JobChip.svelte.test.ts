@@ -49,11 +49,39 @@ test("the chip tells the running job in words", () => {
   expect(chip().textContent).toContain("42%");
 });
 
-test("with no jobs the chip is idle", () => {
+test("with no jobs the chip is a label, with no ring or numbers", () => {
   app({});
-  render(JobChip);
+  const { container } = render(JobChip);
 
   expect(chip().title).toBe("No jobs");
+  expect(chip().textContent?.trim()).toBe("No jobs");
+  expect(container.querySelector(".ring")).toBeNull();
+  expect(container.querySelector(".num")).toBeNull();
+});
+
+test("when all is saved the label says so and a failure count still shows", () => {
+  app({ done: [job(8, "done"), job(9, "failed")] });
+  const { container } = render(JobChip);
+
+  expect(chip().getAttribute("aria-label")).toBe("Jobs: all saved, 1 failed");
+  expect(chip().textContent).toContain("All saved");
+  expect(container.querySelector(".fail")?.textContent).toBe("1");
+  expect(container.querySelector(".ring")).toBeNull();
+});
+
+test("a running job brings the ring and the numbers", () => {
+  app({ running: job(1, "running") });
+  const { container } = render(JobChip);
+
+  expect(container.querySelector(".ring")).not.toBeNull();
+  expect(container.querySelector(".num")).not.toBeNull();
+});
+
+test("paused with a job keeps the ring", () => {
+  app({ paused: true, pending: [job(2)] });
+  const { container } = render(JobChip);
+
+  expect(container.querySelector(".ring")).not.toBeNull();
 });
 
 test("opening the popover clears the failure count", async () => {
@@ -115,21 +143,16 @@ test("no Now with nothing running", async () => {
   expect(screen.queryByRole("button", { name: "Pause" })).toBeNull();
 });
 
-test("Up next removes a row and reorders by drag", async () => {
+test("Up next removes a row", async () => {
   const calls = app({ pending: [job(2), job(3), job(4)] });
   render(JobChip);
   await fireEvent.click(chip());
 
   expect(screen.getAllByText("1:15")).toHaveLength(3);
   const rows = screen.getAllByText(/^clip/).map((n) => n.parentElement as HTMLElement);
-  await fireEvent.dragStart(rows[0]);
-  await fireEvent.drop(rows[2]);
   await fireEvent.click(within(rows[1]).getByRole("button", { name: "Remove from the queue" }));
 
-  expect(calls).toEqual([
-    ["reorder_jobs", { ids: [3, 4, 2] }],
-    ["remove_job", { id: 3 }],
-  ]);
+  expect(calls).toEqual([["remove_job", { id: 3 }]]);
 });
 
 test("Done lists each job with play and its state", async () => {

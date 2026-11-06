@@ -1,12 +1,12 @@
 <script lang="ts">
-  import { cancelJob, type Job, pause, play, removeJob, reorderJobs, resume, thumbUrl } from "./api";
-  import { chipText, failures, newestFailure, nowText, percent, phase, reordered, timeLeft, waiting } from "./jobs";
+  import { cancelJob, type Job, pause, play, removeJob, resume, thumbUrl } from "./api";
+  import { chipText, failures, newestFailure, nowText, percent, phase, timeLeft, waiting } from "./jobs";
   import { store } from "./jobs.svelte";
   import { formatLength } from "./library";
 
   const RING = 2 * Math.PI * 9;
   const ICONS = {
-    encode: "M3 5h18v14H3zM3 9h18M3 15h18M8 5v4M16 5v4M8 15v4M16 15v4",
+    encode: "M7 4.5v15l12-7.5z",
     check: "M12 3l8 3v6c0 4.5-3.2 8-8 9-4.8-1-8-4.5-8-9V6zM8.5 12l2.5 2.5 4.5-5",
     paused: "M9 5v14M15 5v14",
     saved: "M5 12.5l4.5 4.5L19 7",
@@ -14,7 +14,6 @@
   };
 
   let open = $state(false);
-  let dragging = $state(-1);
   let error = $state("");
   let root: HTMLElement;
 
@@ -22,6 +21,7 @@
   const now = $derived(phase(q, store.progress));
   const pct = $derived(percent(q, store.progress));
   const left = $derived(timeLeft(q, store.progress));
+  const quiet = $derived(now === "saved" || now === "idle");
   const failed = $derived(failures(q.done, store.seen));
   const text = $derived(chipText(q, store.progress, failed));
   const running = $derived(now === "encode" || now === "check");
@@ -45,30 +45,27 @@
   function away(e: Event) {
     if (open && e.target instanceof Node && !root.contains(e.target)) open = false;
   }
-
-  function drop(to: number) {
-    if (dragging >= 0 && dragging !== to) run(() => reorderJobs(reordered(q.pending, dragging, to)));
-    dragging = -1;
-  }
 </script>
 
 <svelte:window onpointerdown={away} onkeydown={(e) => e.key === "Escape" && (open = false)} />
 
 <div class="jobs" bind:this={root}>
   <button class="chip" class:open aria-label={text.label} title={text.title} aria-expanded={open} onclick={toggle}>
-    <svg aria-hidden="true" width="22" height="22" viewBox="0 0 22 22" class="ring">
-      <circle cx="11" cy="11" r="9" fill="none" stroke="var(--line)" stroke-width="2.5" />
-      <circle
-        cx="11"
-        cy="11"
-        r="9"
-        fill="none"
-        stroke="var(--green)"
-        stroke-width="2.5"
-        stroke-linecap="round"
-        stroke-dasharray="{(RING * (now === 'saved' ? 100 : (pct ?? 0))) / 100} {RING}"
-      />
-    </svg>
+    {#if !quiet}
+      <svg aria-hidden="true" width="22" height="22" viewBox="0 0 22 22" class="ring">
+        <circle cx="11" cy="11" r="9" fill="none" stroke="var(--line)" stroke-width="2.5" />
+        <circle
+          cx="11"
+          cy="11"
+          r="9"
+          fill="none"
+          stroke="var(--green)"
+          stroke-width="2.5"
+          stroke-linecap="round"
+          stroke-dasharray="{(RING * (pct ?? 0)) / 100} {RING}"
+        />
+      </svg>
+    {/if}
     <svg
       aria-hidden="true"
       width="22"
@@ -81,8 +78,12 @@
       stroke-linejoin="round"
       style="flex: none"><path d={ICONS[now]} /></svg
     >
-    <span class="num">{pct === null ? "" : `${pct}%`}</span>
-    <span class="num dim">{now === "paused" ? "" : (left ?? "")}</span>
+    {#if quiet}
+      <span class="label">{text.title}</span>
+    {:else}
+      <span class="num">{pct === null ? "" : `${pct}%`}</span>
+      <span class="num dim">{now === "paused" ? "" : (left ?? "")}</span>
+    {/if}
     <span class="badges">
       {#if waiting(q)}<span class="badge">+{waiting(q)}</span>{/if}
       {#if failed}<span class="badge fail">{failed}</span>{/if}
@@ -147,26 +148,8 @@
         {#if q.pending.length}
           <h3>Up next</h3>
           <ul>
-            {#each q.pending as job, i (job.id)}
-              <li
-                class="row"
-                draggable="true"
-                ondragstart={() => (dragging = i)}
-                ondragover={(e) => e.preventDefault()}
-                ondrop={() => drop(i)}
-              >
-                <svg
-                  aria-hidden="true"
-                  width="10"
-                  height="14"
-                  viewBox="0 0 12 16"
-                  fill="var(--faint)"
-                  style="flex: none"
-                >
-                  <circle cx="3" cy="3" r="1.4" /><circle cx="9" cy="3" r="1.4" />
-                  <circle cx="3" cy="8" r="1.4" /><circle cx="9" cy="8" r="1.4" />
-                  <circle cx="3" cy="13" r="1.4" /><circle cx="9" cy="13" r="1.4" />
-                </svg>
+            {#each q.pending as job (job.id)}
+              <li class="row">
                 <span class="name">{title(job)}</span>
                 <span class="mono">{formatLength(job.kept_s)}</span>
                 <button
@@ -262,6 +245,15 @@
   .num.dim {
     width: 3.1em;
     color: var(--dim);
+  }
+
+  .label {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    font-size: 12px;
+    white-space: nowrap;
+    text-overflow: ellipsis;
   }
 
   .badges {

@@ -39,14 +39,6 @@ export const failures = (done: Job[], seen: number) => done.filter((j) => j.stat
 export const newestFailure = (done: Job[]) =>
   Math.max(0, ...done.filter((j) => j.status === "failed").map((j) => j.id));
 
-// The pending ids after dragging the row at `from` onto the row at `to`.
-export function reordered(pending: Job[], from: number, to: number) {
-  const ids = pending.map((j) => j.id);
-  ids.splice(to, 0, ...ids.splice(from, 1));
-
-  return ids;
-}
-
 const NAMES: Record<Phase, string> = {
   encode: "Encoding",
   check: "Checking",

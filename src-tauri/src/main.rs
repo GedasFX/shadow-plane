@@ -117,14 +117,6 @@ fn queue(db: State<Db>, worker: State<Worker>) -> Result<jobs::Queue, String> {
 }
 
 #[tauri::command]
-fn reorder_jobs(db: State<Db>, worker: State<Worker>, ids: Vec<i64>) -> Result<(), String> {
-    jobs::reorder(&mut db.0.lock().unwrap(), &ids).map_err(|e| e.to_string())?;
-    worker.changed();
-
-    Ok(())
-}
-
-#[tauri::command]
 fn remove_job(db: State<Db>, worker: State<Worker>, id: i64) -> Result<(), String> {
     jobs::remove(&db.0.lock().unwrap(), id).map_err(|e| e.to_string())?;
     worker.changed();
@@ -248,7 +240,6 @@ fn main() {
             save,
             discard,
             queue,
-            reorder_jobs,
             remove_job,
             pause,
             resume,

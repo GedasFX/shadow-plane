@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
 import type { Job, JobProgress, Queue } from "./api";
-import { chipText, failures, newestFailure, nowText, percent, phase, reordered, timeLeft, waiting } from "./jobs";
+import { chipText, failures, newestFailure, nowText, percent, phase, timeLeft, waiting } from "./jobs";
 
 const job = (id: number, status: Job["status"] = "pending"): Job => ({
   id,
@@ -64,13 +64,6 @@ test("failures count the failed jobs newer than the last one shown", () => {
   expect(failures(done, 5)).toBe(1);
   expect(failures(done, newestFailure(done))).toBe(0);
   expect(newestFailure([job(7, "done")])).toBe(0);
-});
-
-test("dragging a row moves it to the target's place", () => {
-  const pending = [job(1), job(2), job(3)];
-
-  expect(reordered(pending, 0, 2)).toEqual([2, 3, 1]);
-  expect(reordered(pending, 2, 0)).toEqual([3, 1, 2]);
 });
 
 test("the chip says the same in words", () => {

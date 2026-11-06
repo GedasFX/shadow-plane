@@ -213,38 +213,6 @@ pub fn all_done(conn: &Connection, key: &str) -> rusqlite::Result<bool> {
     )
 }
 
-fn pending_ids(conn: &Connection) -> rusqlite::Result<Vec<i64>> {
-    let mut rows = conn.prepare("SELECT id FROM job WHERE status = 'pending' ORDER BY position")?;
-    let ids = rows.query_map([], |row| row.get(0))?;
-
-    ids.collect()
-}
-
-// The ids must be exactly the pending jobs.
-pub fn reorder(conn: &mut Connection, ids: &[i64]) -> Result<(), Error> {
-    let tx = conn.transaction()?;
-    let mut now = pending_ids(&tx)?;
-    let mut wanted = ids.to_vec();
-    now.sort_unstable();
-    wanted.sort_unstable();
-    if now != wanted {
-        return Err(Error::Invalid("job.order.mismatch"));
-    }
-
-    // Spread over the pending jobs' own positions, so the running and finished ones keep theirs.
-    let mut slots: Vec<i64> = {
-        let mut rows = tx.prepare("SELECT position FROM job WHERE status = 'pending'")?;
-        let slots = rows.query_map([], |row| row.get(0))?;
-        slots.collect::<rusqlite::Result<_>>()?
-    };
-    slots.sort_unstable();
-    for (id, position) in ids.iter().zip(slots) {
-        tx.execute("UPDATE job SET position = ?2 WHERE id = ?1", (id, position))?;
-    }
-
-    Ok(tx.commit()?)
-}
-
 pub fn remove(conn: &Connection, id: i64) -> Result<(), Error> {
     let changed = conn.execute(
         "UPDATE job SET status = 'cancelled' WHERE id = ?1 AND status = 'pending'",
@@ -293,7 +261,13 @@ mod tests {
     }
 
     fn ids(conn: &Connection) -> Vec<i64> {
-        pending_ids(conn).unwrap()
+        let mut rows = conn
+            .prepare("SELECT id FROM job WHERE status = 'pending' ORDER BY position")
+            .unwrap();
+        rows.query_map([], |row| row.get(0))
+            .unwrap()
+            .collect::<rusqlite::Result<_>>()
+            .unwrap()
     }
 
     #[test]
@@ -331,40 +305,6 @@ mod tests {
         .unwrap();
         let path = output_path(&conn, Path::new("Z:/Clips"), id).unwrap();
         assert_eq!(path, Path::new("Z:/Clips/_Processed/PEAK/a.mp4"));
-    }
-
-    #[test]
-    fn reorder_sets_the_pending_order() {
-        let mut conn = library();
-        save(&mut conn, "a", &[(1.0, 2.0)]);
-        save(&mut conn, "b", &[(1.0, 2.0)]);
-        save(&mut conn, "c", &[(1.0, 2.0)]);
-        let [a, b, c] = ids(&conn)[..] else { panic!() };
-
-        reorder(&mut conn, &[c, a, b]).unwrap();
-
-        assert_eq!(
-            titles(&queue(&conn, false).unwrap().pending),
-            ["c", "a", "b"]
-        );
-    }
-
-    #[test]
-    fn reorder_refuses_a_list_that_is_not_the_pending_set() {
-        let mut conn = library();
-        save(&mut conn, "a", &[(1.0, 2.0)]);
-        save(&mut conn, "b", &[(1.0, 2.0)]);
-        let [a, b] = ids(&conn)[..] else { panic!() };
-        conn.execute("UPDATE job SET status = 'running' WHERE id = ?1", [a])
-            .unwrap();
-
-        for bad in [vec![a, b], vec![], vec![b, b], vec![b, 99]] {
-            match reorder(&mut conn, &bad) {
-                Err(Error::Invalid(code)) => assert_eq!(code, "job.order.mismatch"),
-                other => panic!("expected a refusal, got {other:?}"),
-            }
-        }
-        reorder(&mut conn, &[b]).unwrap();
     }
 
     #[test]
@@ -440,12 +380,11 @@ mod tests {
         save(&mut conn, "a", &[(1.0, 2.0)]);
         save(&mut conn, "b", &[(1.0, 2.0)]);
         let [a, b] = ids(&conn)[..] else { panic!() };
-        reorder(&mut conn, &[b, a]).unwrap();
 
-        assert_eq!(claim(&conn).unwrap(), Some(b));
         assert_eq!(claim(&conn).unwrap(), Some(a));
+        assert_eq!(claim(&conn).unwrap(), Some(b));
         assert_eq!(claim(&conn).unwrap(), None);
-        assert_eq!(queue(&conn, false).unwrap().running.unwrap().id, b);
+        assert_eq!(queue(&conn, false).unwrap().running.unwrap().id, a);
     }
 
     #[test]

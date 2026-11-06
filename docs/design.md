@@ -41,13 +41,14 @@ placeholder holds its place in the header).
   `‹ ›` walk the to-review videos in the Library's order (games A–Z, then path), whatever its
   filters, and dim at the ends; from a video that isn't to review the right side reads "M to review".
 - The job chip, right-aligned and a fixed 176 px wide so nothing moves: a progress ring, the phase
-  as an icon (encode, check quality, paused, all saved, idle), the percentage and the time left in
-  fixed-width boxes, `+N` waiting, a red count when a job failed. A 2 px green line along the
-  header's bottom edge shows the same progress.
+  as an icon (encode ▶, check quality, paused, all saved, idle), the percentage and the time left in
+  fixed-width boxes, `+N` waiting, a red count when a job failed. With nothing running there is no
+  ring or numbers: the icon and **All saved** or **No jobs** (paused keeps the ring). A 2 px green
+  line along the header's bottom edge shows the same progress.
 - The red count is the failures since the popover was last opened; opening it clears it. Times
   read `m:ss` (`h:mm:ss` past an hour), percentages are whole numbers.
-- Clicking the chip opens a popover: **Now** (pause, cancel), **Up next** (drag to reorder,
-  remove), **Done** (the last 5, each with play), and "Show all history".
+- Clicking the chip opens a popover: **Now** (pause, cancel), **Up next** (remove), **Done** (the
+  last 5, each with play), and "Show all history".
 - Paused with nothing running (a cancel while paused), **Now** shows only "Paused" and Resume. A done
   job's play opens its file in the default video player; a failed one has no file to play.
 - A removed job is cancelled and shows nowhere; Done lists only finished and failed jobs. Discarding a video drops its jobs.

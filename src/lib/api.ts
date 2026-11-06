@@ -71,7 +71,6 @@ export const save = (key: string, clip: ClipInput) => invoke<void>("save", { key
 export const discard = (key: string) => invoke<void>("discard", { key });
 export const queue = () => invoke<Queue>("queue");
 // Every pending job's id, in the new order.
-export const reorderJobs = (ids: number[]) => invoke<void>("reorder_jobs", { ids });
 // Cancels a pending job.
 export const removeJob = (id: number) => invoke<void>("remove_job", { id });
 // Pause freezes the running encode and holds the queue; resume lets both go on. Neither is remembered across a restart.
