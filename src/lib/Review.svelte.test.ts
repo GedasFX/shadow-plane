@@ -305,7 +305,7 @@ test("with no video left to review, Save opens none", async () => {
   await vi.waitFor(() => expect(onopen).toHaveBeenCalledWith(null));
 });
 
-test("Save and make another stays, with a fresh clip and the saved range hatched", async () => {
+test("Save & clip this video again stays, with a fresh clip and the saved range hatched", async () => {
   let saved = false;
   const grown = { ...detail, clips: [...detail.clips, { ...detail.clips[0], pieces: [{ start_s: 20, end_s: 30 }] }] };
   const { container } = await open();
@@ -316,7 +316,7 @@ test("Save and make another stays, with a fresh clip and the saved range hatched
   });
   await fill();
   await fireEvent.click(screen.getByRole("button", { name: "More ways to save" }));
-  await fireEvent.click(screen.getByRole("menuitem", { name: "Save and make another" }));
+  await fireEvent.click(screen.getByRole("menuitem", { name: "Save & clip this video again" }));
 
   await vi.waitFor(() => expect(container.querySelectorAll(".saved")).toHaveLength(2));
   expect((screen.getByLabelText("Title") as HTMLInputElement).value).toBe("");

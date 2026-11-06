@@ -83,9 +83,9 @@ saved clips, or a bin icon (dimmed) for a discarded video.
      picked is a cut, and clicking the picked one again unpicks it;
   5. a dashed `+` at the end: insert a clip, picked from the clips already saved;
   6. the file name it will be saved as;
-  7. **Discard** (asks first: "It moves to the _Bin folder.") and **Save**, a split button: Save
-     and continue (the click; opens the next video) or Save and make another (stays, starts a new
-     whole-video clip, the saved range hatched grey; title, game and labels start over). With no video
+  7. **Discard** (asks first: "It moves to the _Bin folder.") and **Save**, a split button: the click
+     saves and opens the next video; its menu's one item, Save & clip this video again, stays and
+     starts a new whole-video clip, the saved range hatched grey; title, game and labels start over. With no video
      left to review, the Library shows. A toast says what happened.
 
 ## History

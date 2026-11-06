@@ -234,8 +234,7 @@
 
     {#if saveMenu}
       <div class="menu save-menu" role="menu">
-        <button role="menuitem" onclick={() => onsave(false)}>Save and continue</button>
-        <button role="menuitem" onclick={() => onsave(true)}>Save and make another</button>
+        <button role="menuitem" onclick={() => onsave(true)}>Save &amp; clip this video again</button>
       </div>
     {/if}
   </div>
